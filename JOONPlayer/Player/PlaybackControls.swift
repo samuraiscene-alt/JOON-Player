@@ -12,7 +12,7 @@ struct PlaybackControls: View {
         }
         .padding(.horizontal, isLandscape ? 18 : 14)
         .padding(.vertical, isLandscape ? 10 : 14)
-        .background(.ultraThinMaterial.opacity(isLandscape ? 0.72 : 0.9))
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 
