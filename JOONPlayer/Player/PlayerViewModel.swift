@@ -34,6 +34,34 @@ struct PlaybackQueueItem: Identifiable, Equatable {
     }
 }
 
+enum PlaylistRepeatMode: String, CaseIterable, Identifiable {
+    case off
+    case all
+    case one
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .off:
+            return "반복 끔"
+        case .all:
+            return "전체 반복"
+        case .one:
+            return "한 곡 반복"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .off, .all:
+            return "repeat"
+        case .one:
+            return "repeat.1"
+        }
+    }
+}
+
 enum SubtitleVerticalPosition: String, CaseIterable, Identifiable {
     case standard
     case raised
@@ -90,6 +118,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     @Published private(set) var playlistItems: [PlaybackQueueItem] = []
     @Published private(set) var playlistIndex: Int = 0
+    @Published private(set) var playlistRepeatMode: PlaylistRepeatMode = .off
+    @Published private(set) var isPlaylistShuffleEnabled = false
 
     let mediaPlayer = VLCMediaPlayer()
 
@@ -115,6 +145,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private var suppressAutomaticAdvance = true
     private var lastObservedPlaybackSecond: Double = 0
+    private var playlistBaseItems: [PlaybackQueueItem] = []
 
     private enum PreferenceKey {
         static let subtitleFontScale = "joonplayer.subtitle.fontScale"
@@ -195,8 +226,14 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func load(url: URL) {
-        playlistItems = [PlaybackQueueItem(url: url)]
+        let item = PlaybackQueueItem(url: url)
+
+        playlistBaseItems = [item]
+        playlistItems = [item]
         playlistIndex = 0
+        playlistRepeatMode = .off
+        isPlaylistShuffleEnabled = false
+
         loadMedia(url: url)
     }
 
@@ -209,22 +246,40 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         guard let firstURL = uniqueURLs.first else { return }
 
-        playlistItems = uniqueURLs.map(PlaybackQueueItem.init(url:))
+        playlistBaseItems = uniqueURLs.map(PlaybackQueueItem.init(url:))
+        playlistItems = playlistBaseItems
         playlistIndex = 0
+        playlistRepeatMode = .off
+        isPlaylistShuffleEnabled = false
+
         loadMedia(url: firstURL)
     }
 
     func playNextPlaylistItem() {
-        guard canPlayNextPlaylistItem else { return }
+        guard playlistItems.count > 1 else { return }
 
-        playlistIndex += 1
+        if playlistIndex + 1 < playlistItems.count {
+            playlistIndex += 1
+        } else if playlistRepeatMode == .all {
+            playlistIndex = 0
+        } else {
+            return
+        }
+
         loadMedia(url: playlistItems[playlistIndex].url)
     }
 
     func playPreviousPlaylistItem() {
-        guard canPlayPreviousPlaylistItem else { return }
+        guard playlistItems.count > 1 else { return }
 
-        playlistIndex -= 1
+        if playlistIndex > 0 {
+            playlistIndex -= 1
+        } else if playlistRepeatMode == .all {
+            playlistIndex = playlistItems.count - 1
+        } else {
+            return
+        }
+
         loadMedia(url: playlistItems[playlistIndex].url)
     }
 
@@ -241,7 +296,114 @@ final class PlayerViewModel: NSObject, ObservableObject {
         loadMedia(url: playlistItems[index].url)
     }
 
-    private func loadMedia(url: URL) {
+    func cyclePlaylistRepeatMode() {
+        switch playlistRepeatMode {
+        case .off:
+            playlistRepeatMode = .all
+        case .all:
+            playlistRepeatMode = .one
+        case .one:
+            playlistRepeatMode = .off
+        }
+    }
+
+    func togglePlaylistShuffle() {
+        guard playlistItems.count > 1 else { return }
+        guard let currentID = currentPlaylistItemID else { return }
+
+        if isPlaylistShuffleEnabled {
+            playlistItems = playlistBaseItems
+            playlistIndex = playlistItems.firstIndex {
+                $0.id == currentID
+            } ?? 0
+            isPlaylistShuffleEnabled = false
+            return
+        }
+
+        let currentIndex = playlistIndex
+        let currentItem = playlistItems[currentIndex]
+
+        var shuffledItems = playlistBaseItems.filter {
+            $0.id != currentID
+        }
+        shuffledItems.shuffle()
+
+        let insertionIndex = min(
+            currentIndex,
+            shuffledItems.count
+        )
+
+        shuffledItems.insert(
+            currentItem,
+            at: insertionIndex
+        )
+
+        playlistItems = shuffledItems
+        playlistIndex = insertionIndex
+        isPlaylistShuffleEnabled = true
+    }
+
+    func movePlaylistItemUp(id: UUID) {
+        guard !isPlaylistShuffleEnabled else { return }
+        guard let index = playlistItems.firstIndex(
+            where: { $0.id == id }
+        ) else {
+            return
+        }
+
+        guard index > 0 else { return }
+        movePlaylistItem(from: index, to: index - 1)
+    }
+
+    func movePlaylistItemDown(id: UUID) {
+        guard !isPlaylistShuffleEnabled else { return }
+        guard let index = playlistItems.firstIndex(
+            where: { $0.id == id }
+        ) else {
+            return
+        }
+
+        guard index + 1 < playlistItems.count else { return }
+        movePlaylistItem(from: index, to: index + 1)
+    }
+
+    func canMovePlaylistItemUp(id: UUID) -> Bool {
+        guard !isPlaylistShuffleEnabled else { return false }
+
+        return playlistItems.firstIndex {
+            $0.id == id
+        }.map { $0 > 0 } ?? false
+    }
+
+    func canMovePlaylistItemDown(id: UUID) -> Bool {
+        guard !isPlaylistShuffleEnabled else { return false }
+
+        return playlistItems.firstIndex {
+            $0.id == id
+        }.map { $0 + 1 < playlistItems.count } ?? false
+    }
+
+    private func movePlaylistItem(
+        from sourceIndex: Int,
+        to destinationIndex: Int
+    ) {
+        guard playlistItems.indices.contains(sourceIndex) else { return }
+        guard playlistItems.indices.contains(destinationIndex) else { return }
+        guard let currentID = currentPlaylistItemID else { return }
+
+        let item = playlistItems.remove(at: sourceIndex)
+        playlistItems.insert(item, at: destinationIndex)
+
+        playlistBaseItems = playlistItems
+        playlistIndex = playlistItems.firstIndex {
+            $0.id == currentID
+        } ?? 0
+    }
+
+    private func loadMedia(
+        url: URL,
+        allowResume: Bool = true
+    ) {
         persistPlaybackProgress()
 
         suppressAutomaticAdvance = true
@@ -254,9 +416,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
         isUsingSecurityScope = url.startAccessingSecurityScopedResource()
 
         currentResumeIdentifier = PlaybackResumeStore.identifier(for: url)
-        pendingResumeSeconds = currentResumeIdentifier.flatMap {
-            resumeStore.position(for: $0)
-        }
+        pendingResumeSeconds = allowResume
+            ? currentResumeIdentifier.flatMap {
+                resumeStore.position(for: $0)
+            }
+            : nil
         lastSavedResumeSecond = -1
         lastObservedPlaybackSecond = 0
 
@@ -308,8 +472,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         suppressAutomaticAdvance = true
         lastObservedPlaybackSecond = 0
+        playlistBaseItems = []
         playlistItems = []
         playlistIndex = 0
+        playlistRepeatMode = .off
+        isPlaylistShuffleEnabled = false
 
         hasMedia = false
         isPlaying = false
@@ -487,11 +654,17 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     var canPlayPreviousPlaylistItem: Bool {
-        playlistIndex > 0
+        guard playlistItems.count > 1 else { return false }
+
+        return playlistIndex > 0
+            || playlistRepeatMode == .all
     }
 
     var canPlayNextPlaylistItem: Bool {
-        playlistIndex + 1 < playlistItems.count
+        guard playlistItems.count > 1 else { return false }
+
+        return playlistIndex + 1 < playlistItems.count
+            || playlistRepeatMode == .all
     }
 
     var formattedCurrentTime: String {
@@ -799,8 +972,21 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             isLoading = false
             isPlaying = false
 
-            if finishedNaturally, canPlayNextPlaylistItem {
-                playNextPlaylistItem()
+            if finishedNaturally {
+                switch playlistRepeatMode {
+                case .one:
+                    if playlistItems.indices.contains(playlistIndex) {
+                        loadMedia(
+                            url: playlistItems[playlistIndex].url,
+                            allowResume: false
+                        )
+                    }
+
+                case .off, .all:
+                    if canPlayNextPlaylistItem {
+                        playNextPlaylistItem()
+                    }
+                }
             }
 
         case .error:
