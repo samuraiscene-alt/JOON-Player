@@ -12,17 +12,17 @@ JOON Player의 고급 자르기 / 복구 엔진은 **FFmpegKitNext**를 기준�
 - Apple API: Objective-C API exposed through the `ffmpegkit` framework module
 
 기존 `ffmpeg-kit`은 retired 상태이므로 새 앱 의존성으로 다시 채택하지 않는다.
-FFmpegKitNext는 기존 프로젝트의 원 저자가 이어서 유지하는 공식 후속 프로젝트를 사용한다.
+FFmpegKitNext는 기존 프로젝트의 원 저자가 이어서 유지하는 후속 프로젝트를 사용한다.
 
 ## 현재 JOON Player 코드 상태
 
-`AdvancedVideoTrimService`는 `#if canImport(ffmpegkit)`로 작성되어 있다.
+`FFmpegKitNextRuntime`은 `#if canImport(ffmpegkit)`로 동작한다.
 
-따라서 지금 저장소는 FFmpegKitNext 바이너리가 없어도 컴파일 가능한 구조를 유지하고,
-나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 MKV/AVI/TS/M2TS/WebM/FLV 자르기 경로가 자동으로 활성화된다.
+따라서 지금 저장소는 FFmpegKitNext 바이너리가 없어도 나머지 코드 구조를 유지하고,
+나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 고급 자르기와 복구/리먹스 경로가 자동으로 활성화된다.
 
-MP4/MOV/M4V는 기존 AVFoundation 빠른 자르기를 우선 사용하고,
-그 경로가 실패하면서 FFmpegKitNext가 연결되어 있으면 FFmpeg 스트림 복사 방식으로 한 번 더 시도한다.
+모든 FFmpeg 명령은 하나의 전용 serial queue를 공유한다.
+FFmpeg fftools의 process-global 상태 때문에 자르기, 복구, 향후 썸네일/변환 작업을 동시에 실행하지 않도록 하기 위한 구조다.
 
 ## Mac/Xcode 단계
 
@@ -43,9 +43,9 @@ git checkout v9.0.0
 
 FFmpegKitNext 공식 Apple 문서는 Xcode 26.0+와 Command Line Tools를 요구한다.
 
-## 1차 FFmpeg 빠른 자르기 명령 구조
+## 고급 빠른 자르기
 
-JOON Player는 재인코딩 없이 스트림을 복사하는 방식부터 사용한다.
+재인코딩 없이 스트림을 복사한다.
 
 ```
 -ss <start>
@@ -71,12 +71,35 @@ JOON Player는 재인코딩 없이 스트림을 복사하는 방식부터 사용
 이 방식은 빠르고 원본 화질을 다시 압축하지 않지만, 코덱의 키프레임 위치 때문에 시작점이 프레임 단위로 완전히 정확하지 않을 수 있다.
 정확한 프레임 컷은 이후 선택형 재인코딩 경로로 분리한다.
 
-외부 SRT 자막은 현재 새 영상에 포함하지 않는다.
+## 빠른 복구 / 리먹스
 
-## 동시 실행 원칙
+현재 파일에서 FFmpeg가 읽어낼 수 있는 영상·오디오·내장 자막 스트림을 새 MKV 컨테이너로 다시 묶는다.
 
-FFmpeg의 fftools 계층은 전역 상태를 사용하므로 JOON Player는 FFmpeg 작업을 전용 serial queue 한 곳에서만 실행하도록 한다.
-향후 썸네일 생성, 복구, 변환 기능이 추가되어도 같은 큐를 공유해야 한다.
+```
+-fflags +genpts+discardcorrupt
+-err_detect ignore_err
+-i <input>
+-map 0:v?
+-map 0:a?
+-map 0:s?
+-map_metadata 0
+-c copy
+-avoid_negative_ts make_zero
+<output.mkv>
+```
+
+목적은 다음과 같다.
+
+- 손상 패킷을 가능한 경우 건너뛰기
+- 누락/비정상 타임스탬프를 가능한 범위에서 다시 생성
+- 오래되거나 비정상적인 컨테이너 인덱스 문제를 새 컨테이너로 재작성
+- 재인코딩 없이 원본 스트림을 최대한 보존
+
+이 기능은 **원본 데이터를 복원하는 복구 프로그램이 아니다**.
+이미 유실된 프레임, 읽을 수 없는 코덱 데이터, MP4의 핵심 메타데이터가 완전히 사라진 경우 등은 리먹스만으로 복구되지 않을 수 있다.
+
+외부 SRT 자막은 복구본에 자동으로 합치지 않는다.
+원본 안에 들어 있던 내장 자막 스트림만 가능한 경우 복사한다.
 
 ## 라이선스
 

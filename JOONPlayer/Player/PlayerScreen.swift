@@ -10,6 +10,7 @@ struct PlayerScreen: View {
     @State private var showVolumePopup = false
     @State private var showSettings = false
     @State private var showTrimEditor = false
+    @State private var showRepairView = false
     @State private var isControlsLocked = false
     @State private var autoHideTask: Task<Void, Never>?
 
@@ -55,6 +56,9 @@ struct PlayerScreen: View {
         }
         .sheet(isPresented: $showTrimEditor) {
             TrimEditorView(player: player)
+        }
+        .sheet(isPresented: $showRepairView) {
+            VideoRepairView(player: player)
         }
         .onDisappear {
             autoHideTask?.cancel()
@@ -105,6 +109,10 @@ struct PlayerScreen: View {
                     onChooseSubtitle: {
                         showSettings = false
                         onChooseSubtitle()
+                    },
+                    onRepairVideo: {
+                        showSettings = false
+                        showRepairView = true
                     }
                 )
                 .padding(.top, 58)

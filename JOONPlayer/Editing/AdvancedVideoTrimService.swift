@@ -1,9 +1,5 @@
 import Foundation
 
-#if canImport(ffmpegkit)
-@preconcurrency import ffmpegkit
-#endif
-
 enum VideoTrimCoordinator {
     static func export(
         sourceURL: URL,
@@ -63,11 +59,7 @@ enum AdvancedVideoTrimService {
     }
 
     static var isAvailable: Bool {
-        #if canImport(ffmpegkit)
-        true
-        #else
-        false
-        #endif
+        FFmpegKitNextRuntime.isAvailable
     }
 
     static func prefersFFmpeg(for sourceURL: URL?) -> Bool {
@@ -86,42 +78,17 @@ enum AdvancedVideoTrimService {
         startSeconds: Double,
         endSeconds: Double
     ) async throws -> URL {
-        guard endSeconds - startSeconds >= 0.5 else {
-            throw AdvancedTrimError.invalidRange
-        }
-
-        #if canImport(ffmpegkit)
-        return try await FFmpegKitNextBridge.export(
-            sourceURL: sourceURL,
-            startSeconds: startSeconds,
-            endSeconds: endSeconds
-        )
-        #else
-        throw AdvancedTrimError.engineNotLinked
-        #endif
-    }
-}
-
-#if canImport(ffmpegkit)
-private enum FFmpegKitNextBridge {
-    private static let ffmpegQueue = DispatchQueue(
-        label: "com.joonplayer.ffmpeg.serial",
-        qos: .utility
-    )
-
-    static func export(
-        sourceURL: URL,
-        startSeconds: Double,
-        endSeconds: Double
-    ) async throws -> URL {
         let duration = endSeconds - startSeconds
 
         guard startSeconds >= 0, duration >= 0.5 else {
-            throw AdvancedVideoTrimService.AdvancedTrimError.invalidRange
+            throw AdvancedTrimError.invalidRange
+        }
+
+        guard FFmpegKitNextRuntime.isAvailable else {
+            throw AdvancedTrimError.engineNotLinked
         }
 
         let outputURL = makeOutputURL(for: sourceURL)
-
         try? FileManager.default.removeItem(at: outputURL)
 
         let arguments = [
@@ -139,40 +106,23 @@ private enum FFmpegKitNextBridge {
             outputURL.path
         ]
 
-        return try await withCheckedThrowingContinuation { continuation in
-            FFmpegKit.execute(
-                withArgumentsAsync: arguments,
-                withCompleteCallback: { session in
-                    let returnCode = session?.getReturnCode()
+        do {
+            try await FFmpegKitNextRuntime.execute(arguments: arguments)
+            return outputURL
+        } catch let error as FFmpegKitNextRuntime.ExecutionError {
+            try? FileManager.default.removeItem(at: outputURL)
 
-                    if ReturnCode.isSuccess(returnCode) {
-                        continuation.resume(returning: outputURL)
-                        return
-                    }
-
-                    try? FileManager.default.removeItem(at: outputURL)
-
-                    if ReturnCode.isCancel(returnCode) {
-                        continuation.resume(
-                            throwing: AdvancedVideoTrimService.AdvancedTrimError.cancelled
-                        )
-                        return
-                    }
-
-                    let details =
-                        session?.getFailStackTrace()
-                        ?? session?.getOutput()
-
-                    continuation.resume(
-                        throwing: AdvancedVideoTrimService.AdvancedTrimError.failed(
-                            details
-                        )
-                    )
-                },
-                withLogCallback: nil,
-                withStatisticsCallback: nil,
-                onDispatchQueue: ffmpegQueue
-            )
+            switch error {
+            case .engineNotLinked:
+                throw AdvancedTrimError.engineNotLinked
+            case .cancelled:
+                throw AdvancedTrimError.cancelled
+            case .failed(let message):
+                throw AdvancedTrimError.failed(message)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw AdvancedTrimError.failed(error.localizedDescription)
         }
     }
 
@@ -202,4 +152,3 @@ private enum FFmpegKitNextBridge {
         String(format: "%.3f", seconds)
     }
 }
-#endif

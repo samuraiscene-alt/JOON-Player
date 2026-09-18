@@ -4,6 +4,7 @@ struct QuickSettingsPanel: View {
     @ObservedObject var player: PlayerViewModel
     let onChooseAnotherVideo: () -> Void
     let onChooseSubtitle: () -> Void
+    let onRepairVideo: () -> Void
 
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
@@ -30,6 +31,11 @@ struct QuickSettingsPanel: View {
                     .overlay(.white.opacity(0.12))
 
                 pictureInPictureRow
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                repairRow
 
                 Divider()
                     .overlay(.white.opacity(0.12))
@@ -287,6 +293,28 @@ struct QuickSettingsPanel: View {
         .foregroundStyle(.white)
         .disabled(!player.isPictureInPictureReady)
         .opacity(player.isPictureInPictureReady ? 1 : 0.45)
+    }
+
+    private var repairRow: some View {
+        Button(action: onRepairVideo) {
+            HStack {
+                Label("영상 복구 / 리먹스", systemImage: "wrench.and.screwdriver")
+
+                Spacer()
+
+                Text(
+                    VideoRepairService.isAvailable
+                    ? "준비됨"
+                    : "연결 대기"
+                )
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.45))
+            }
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
     }
 
     private func rateLabel(_ rate: Float) -> String {

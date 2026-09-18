@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 9 — Phase 8 기능 + FFmpegKitNext 고급 자르기 경로 준비
+Phase 10 — Phase 9 기능 + 손상 영상 빠른 복구 / 리먹스
 
 현재 포함된 기능:
 
@@ -33,7 +33,10 @@ Phase 9 — Phase 8 기능 + FFmpegKitNext 고급 자르기 경로 준비
 - 원본을 보존한 채 새 영상 파일 생성
 - 완료 후 iOS 공유 화면에서 파일 앱으로 저장
 - FFmpegKitNext 연결 시 MKV / AVI / TS / M2TS / WebM / FLV 빠른 자르기 자동 활성화
-- FFmpeg 작업은 충돌 방지를 위해 전용 serial queue에서 순차 실행
+- 영상 복구 / 리먹스 화면
+- 읽을 수 있는 영상·오디오·내장 자막을 새 MKV 복구본으로 재작성
+- 손상 패킷 건너뛰기 및 타임스탬프 재생성 시도
+- 모든 FFmpeg 작업을 하나의 전용 serial queue에서 순차 실행
 - 재생 컨트롤 화면 잠금
 - 잠금 상태에서는 재생바 / 10초 이동 / 재생 / 볼륨 / 설정 터치 차단
 - 잠금 상태에는 잠금 해제 버튼만 표시
@@ -48,6 +51,20 @@ Phase 9 — Phase 8 기능 + FFmpegKitNext 고급 자르기 경로 준비
 - 미완료 / 일부 손상 영상도 우선 재생 시도
 - 실제 VLC 오류가 발생했을 때만 오류 안내
 - Supabase 사용 안 함
+
+## 영상 복구 / 리먹스
+
+빠른 설정의 **영상 복구 / 리먹스**에서 현재 영상의 복구본 생성을 시도할 수 있습니다.
+
+복구는 재인코딩이 아니라 FFmpeg 스트림 복사 방식입니다.
+원본 파일은 그대로 두고, FFmpeg가 읽을 수 있는 영상·오디오·내장 자막 스트림을 새 **MKV** 컨테이너에 다시 담습니다.
+
+복구 과정에서는 가능한 경우 손상 패킷을 건너뛰고 타임스탬프를 새로 생성해 컨테이너/인덱스/타임스탬프 계열 문제의 재생 가능성을 높입니다.
+
+단, 이미 유실된 영상 데이터나 심하게 깨진 코덱 데이터, MP4 핵심 메타데이터가 완전히 사라진 경우까지 복원하는 기능은 아닙니다.
+
+FFmpegKitNext가 아직 Xcode 빌드에 연결되지 않은 상태에서는 메뉴에 **연결 대기**가 표시되고 복구 버튼이 비활성화됩니다.
+나중에 `ffmpegkit` 모듈을 연결하면 같은 코드에서 자동으로 활성화됩니다.
 
 ## 영상 구간 자르기
 
@@ -150,14 +167,14 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 4. CocoaPods 설치 후 `pod install`
 5. Xcode → Signing & Capabilities → Background Modes 추가
 6. **Audio, AirPlay, and Picture in Picture** 활성화
-7. 생성된 `.xcworkspace`를 열어 실기기 빌드
+7. FFmpegKitNext v9.0.0 iOS XCFramework를 로컬 빌드하여 Xcode에 연결
+8. 생성된 `.xcworkspace`를 열어 실기기 빌드
 
 ## 다음 개발 순서
 
-1. Mac/Xcode 확보 시 FFmpegKitNext v9.0.0 로컬 XCFramework 빌드 및 실기기 연결
-2. 손상 영상 복구 / 리먹스 기능
-3. 프레임 정확 자르기(선택형 재인코딩)
-4. 필요할 때만 Supabase 기능 검토
+1. 프레임 정확 자르기(선택형 재인코딩)
+2. FFmpeg 복구 실패 로그 요약 / 사용자 안내 개선
+3. 필요할 때만 Supabase 기능 검토
 
 ## 설계 원칙
 
