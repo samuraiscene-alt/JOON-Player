@@ -50,6 +50,26 @@ struct PlayerScreen: View {
             VLCVideoView(player: player)
                 .background(Color.black)
 
+            HardwareKeyboardShortcutReceiver(
+                isEnabled: hardwareKeyboardShortcutsEnabled,
+                onPlayPause: handleKeyboardPlayPause,
+                onSeekBackward: {
+                    handleDoubleTap(.backward)
+                },
+                onSeekForward: {
+                    handleDoubleTap(.forward)
+                },
+                onVolumeUp: {
+                    handleKeyboardVolumeChange(by: 0.05)
+                },
+                onVolumeDown: {
+                    handleKeyboardVolumeChange(by: -0.05)
+                },
+                onToggleMute: handleKeyboardToggleMute
+            )
+            .frame(width: 0, height: 0)
+            .allowsHitTesting(false)
+
             videoGestureLayer
 
             if let seekGestureFeedback {
@@ -176,6 +196,20 @@ struct PlayerScreen: View {
             endTemporaryDoubleSpeed()
             autoHideTask?.cancel()
         }
+    }
+
+    private var hardwareKeyboardShortcutsEnabled: Bool {
+        player.hasMedia
+            && !player.isLoading
+            && !isControlsLocked
+            && !showSettings
+            && !showVolumePopup
+            && !showTrimEditor
+            && !showRepairView
+            && !showMediaInfo
+            && !showSnapshotShareSheet
+            && !showPlaylist
+            && !isCapturingSnapshot
     }
 
     private var videoGestureLayer: some View {
@@ -904,6 +938,77 @@ struct PlayerScreen: View {
         scheduleAutoHideIfNeeded()
     }
 
+    private func handleKeyboardPlayPause() {
+        guard hardwareKeyboardShortcutsEnabled else {
+            return
+        }
+
+        endTemporaryDoubleSpeed()
+        player.togglePlayback()
+        controlsVisible = true
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func handleKeyboardVolumeChange(
+        by delta: Double
+    ) {
+        guard hardwareKeyboardShortcutsEnabled else {
+            return
+        }
+
+        let target = min(
+            max(player.volume + delta, 0),
+            1
+        )
+
+        player.setVolume(target)
+        showKeyboardVolumeFeedback(
+            value: target
+        )
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func handleKeyboardToggleMute() {
+        guard hardwareKeyboardShortcutsEnabled else {
+            return
+        }
+
+        player.toggleMute()
+
+        showKeyboardVolumeFeedback(
+            value: player.isMuted
+                ? 0
+                : player.volume
+        )
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func showKeyboardVolumeFeedback(
+        value: Double
+    ) {
+        verticalAdjustmentFeedbackTask?.cancel()
+
+        verticalAdjustmentFeedback =
+            VerticalAdjustmentFeedback(
+                mode: .volume,
+                value: min(max(value, 0), 1)
+            )
+
+        verticalAdjustmentFeedbackTask = Task {
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning
+                        .verticalFeedbackMilliseconds
+                )
+            )
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                verticalAdjustmentFeedback = nil
+            }
+        }
+    }
+
     private func handleSingleTap() {
         guard !isControlsLocked else { return }
         guard !isTemporaryDoubleSpeed else { return }
@@ -1192,6 +1297,204 @@ private enum SeekGestureFeedback: Equatable {
             return "-10초"
         case .forward:
             return "+10초"
+        }
+    }
+}
+
+
+private struct HardwareKeyboardShortcutReceiver:
+    UIViewRepresentable
+{
+    let isEnabled: Bool
+    let onPlayPause: () -> Void
+    let onSeekBackward: () -> Void
+    let onSeekForward: () -> Void
+    let onVolumeUp: () -> Void
+    let onVolumeDown: () -> Void
+    let onToggleMute: () -> Void
+
+    func makeUIView(
+        context: Context
+    ) -> HardwareKeyboardResponderView {
+        let view = HardwareKeyboardResponderView()
+
+        view.configure(
+            onPlayPause: onPlayPause,
+            onSeekBackward: onSeekBackward,
+            onSeekForward: onSeekForward,
+            onVolumeUp: onVolumeUp,
+            onVolumeDown: onVolumeDown,
+            onToggleMute: onToggleMute
+        )
+        view.setShortcutEnabled(isEnabled)
+
+        return view
+    }
+
+    func updateUIView(
+        _ uiView: HardwareKeyboardResponderView,
+        context: Context
+    ) {
+        uiView.configure(
+            onPlayPause: onPlayPause,
+            onSeekBackward: onSeekBackward,
+            onSeekForward: onSeekForward,
+            onVolumeUp: onVolumeUp,
+            onVolumeDown: onVolumeDown,
+            onToggleMute: onToggleMute
+        )
+        uiView.setShortcutEnabled(isEnabled)
+    }
+}
+
+private final class HardwareKeyboardResponderView: UIView {
+    private var shortcutsEnabled = false
+
+    private var onPlayPause: (() -> Void)?
+    private var onSeekBackward: (() -> Void)?
+    private var onSeekForward: (() -> Void)?
+    private var onVolumeUp: (() -> Void)?
+    private var onVolumeDown: (() -> Void)?
+    private var onToggleMute: (() -> Void)?
+
+    override var canBecomeFirstResponder: Bool {
+        true
+    }
+
+    override var keyCommands: [UIKeyCommand]? {
+        guard shortcutsEnabled else {
+            return []
+        }
+
+        return [
+            makeCommand(
+                input: " ",
+                title: "재생 / 일시정지"
+            ),
+            makeCommand(
+                input: UIKeyCommand.inputLeftArrow,
+                title: "10초 뒤로"
+            ),
+            makeCommand(
+                input: UIKeyCommand.inputRightArrow,
+                title: "10초 앞으로"
+            ),
+            makeCommand(
+                input: UIKeyCommand.inputUpArrow,
+                title: "볼륨 올리기"
+            ),
+            makeCommand(
+                input: UIKeyCommand.inputDownArrow,
+                title: "볼륨 내리기"
+            ),
+            makeCommand(
+                input: "m",
+                title: "음소거 / 해제"
+            )
+        ]
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        updateFirstResponderState()
+    }
+
+    func configure(
+        onPlayPause: @escaping () -> Void,
+        onSeekBackward: @escaping () -> Void,
+        onSeekForward: @escaping () -> Void,
+        onVolumeUp: @escaping () -> Void,
+        onVolumeDown: @escaping () -> Void,
+        onToggleMute: @escaping () -> Void
+    ) {
+        self.onPlayPause = onPlayPause
+        self.onSeekBackward = onSeekBackward
+        self.onSeekForward = onSeekForward
+        self.onVolumeUp = onVolumeUp
+        self.onVolumeDown = onVolumeDown
+        self.onToggleMute = onToggleMute
+    }
+
+    func setShortcutEnabled(
+        _ enabled: Bool
+    ) {
+        guard shortcutsEnabled != enabled else {
+            if enabled {
+                updateFirstResponderState()
+            }
+            return
+        }
+
+        shortcutsEnabled = enabled
+        updateFirstResponderState()
+    }
+
+    private func updateFirstResponderState() {
+        if shortcutsEnabled {
+            guard window != nil else { return }
+
+            DispatchQueue.main.async { [weak self] in
+                guard
+                    let self,
+                    self.shortcutsEnabled,
+                    self.window != nil,
+                    !self.isFirstResponder
+                else {
+                    return
+                }
+
+                _ = self.becomeFirstResponder()
+            }
+        } else if isFirstResponder {
+            resignFirstResponder()
+        }
+    }
+
+    private func makeCommand(
+        input: String,
+        title: String
+    ) -> UIKeyCommand {
+        let command = UIKeyCommand(
+            input: input,
+            modifierFlags: [],
+            action: #selector(
+                handleKeyCommand(_:)
+            )
+        )
+
+        command.discoverabilityTitle = title
+        command.wantsPriorityOverSystemBehavior = true
+
+        return command
+    }
+
+    @objc
+    private func handleKeyCommand(
+        _ command: UIKeyCommand
+    ) {
+        guard shortcutsEnabled else { return }
+
+        switch command.input {
+        case " ":
+            onPlayPause?()
+
+        case UIKeyCommand.inputLeftArrow:
+            onSeekBackward?()
+
+        case UIKeyCommand.inputRightArrow:
+            onSeekForward?()
+
+        case UIKeyCommand.inputUpArrow:
+            onVolumeUp?()
+
+        case UIKeyCommand.inputDownArrow:
+            onVolumeDown?()
+
+        case "m", "M":
+            onToggleMute?()
+
+        default:
+            break
         }
     }
 }
