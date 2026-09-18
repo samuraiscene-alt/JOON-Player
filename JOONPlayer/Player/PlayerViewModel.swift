@@ -1,6 +1,7 @@
+import AVFoundation
 import Foundation
-import MobileVLCKit
 import UIKit
+import VLCKit
 
 enum VideoDisplayMode: String, CaseIterable, Identifiable {
     case original
@@ -40,6 +41,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var subtitleWasAutoLoaded = false
     @Published var subtitleDelayMilliseconds = 0
 
+    @Published var isPictureInPictureReady = false
+    @Published var isPictureInPictureActive = false
+
     let mediaPlayer = VLCMediaPlayer()
 
     private var securityScopedURL: URL?
@@ -52,9 +56,12 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private var subtitleNeedsAttach = false
     private var pendingSubtitleIsAutomatic = false
 
+    private var pictureInPictureController: (any VLCPictureInPictureWindowControlling)?
+
     override init() {
         super.init()
         mediaPlayer.delegate = self
+        configureAudioSession()
     }
 
     deinit {
@@ -63,12 +70,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         releaseSecurityScope()
     }
 
-    func attach(to view: UIView) {
-        if mediaPlayer.drawable as? UIView !== view {
-            mediaPlayer.drawable = view
-        }
-
-        updateDrawableSize(view.bounds.size)
+    func attach(to drawable: AnyObject) {
+        mediaPlayer.drawable = drawable
     }
 
     func updateDrawableSize(_ size: CGSize) {
@@ -81,6 +84,32 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         drawableSize = size
         applyVideoDisplayMode()
+    }
+
+    func registerPictureInPictureController(
+        _ controller: (any VLCPictureInPictureWindowControlling)?
+    ) {
+        pictureInPictureController = controller
+        isPictureInPictureReady = controller != nil
+
+        controller?.stateChangeEventHandler = { [weak self] isStarted in
+            Task { @MainActor in
+                self?.isPictureInPictureActive = isStarted
+            }
+        }
+    }
+
+    func togglePictureInPicture() {
+        guard let pictureInPictureController else {
+            errorMessage = "PiP가 아직 준비되지 않았습니다."
+            return
+        }
+
+        if isPictureInPictureActive {
+            pictureInPictureController.stopPictureInPicture()
+        } else {
+            pictureInPictureController.startPictureInPicture()
+        }
     }
 
     func load(url: URL) {
@@ -111,6 +140,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
             queueSubtitle(url: automaticSubtitle, isAutomatic: true)
         }
 
+        configureAudioSession()
         applyVolumeToEngine()
         applyVideoDisplayMode()
         mediaPlayer.play()
@@ -225,6 +255,17 @@ final class PlayerViewModel: NSObject, ObservableObject {
         return String(format: "%+.1f초", seconds)
     }
 
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback)
+            try session.setActive(true)
+        } catch {
+            // PiP/백그라운드 오디오 설정 실패가 영상 재생 자체를 막지는 않게 둔다.
+        }
+    }
+
     private func applyVolumeToEngine() {
         let effectiveVolume = isMuted ? 0 : volume
         mediaPlayer.audio.isMuted = isMuted
@@ -252,6 +293,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
             mediaPlayer.videoAspectRatio = nil
             mediaPlayer.videoFitMode = .larger
         }
+    }
+
+    private func invalidatePictureInPicturePlaybackState() {
+        pictureInPictureController?.invalidatePlaybackState()
     }
 
     private static func formatTime(_ seconds: Double) -> String {
@@ -370,49 +415,50 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 }
 
-extension PlayerViewModel: VLCMediaPlayerDelegate {
-    nonisolated func mediaPlayerStateChanged(_ aNotification: Notification) {
-        Task { @MainActor in
-            switch mediaPlayer.state {
-            case .opening, .buffering:
-                isLoading = true
+extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
+    func mediaPlayerStateChanged(_ newState: VLCMediaPlayerState) {
+        switch newState {
+        case .opening, .buffering:
+            isLoading = true
 
-            case .playing:
-                isLoading = false
-                isPlaying = true
-                refreshDuration()
-                applyVideoDisplayMode()
-                attachPendingSubtitleIfPossible()
+        case .playing:
+            isLoading = false
+            isPlaying = true
+            refreshDuration()
+            applyVideoDisplayMode()
+            attachPendingSubtitleIfPossible()
 
-            case .paused:
-                isLoading = false
-                isPlaying = false
-                attachPendingSubtitleIfPossible()
+        case .paused:
+            isLoading = false
+            isPlaying = false
+            attachPendingSubtitleIfPossible()
 
-            case .stopped:
-                isLoading = false
-                isPlaying = false
+        case .stopping, .stopped:
+            isLoading = false
+            isPlaying = false
 
-            case .ended:
-                isLoading = false
-                isPlaying = false
-                refreshTime()
+        case .error:
+            isLoading = false
+            isPlaying = false
+            errorMessage = "이 파일의 일부 또는 전체를 정상적으로 읽을 수 없습니다."
 
-            case .error:
-                isLoading = false
-                isPlaying = false
-                errorMessage = "이 파일의 일부 또는 전체를 정상적으로 읽을 수 없습니다."
-
-            default:
-                break
-            }
+        @unknown default:
+            break
         }
+
+        invalidatePictureInPicturePlaybackState()
     }
 
-    nonisolated func mediaPlayerTimeChanged(_ aNotification: Notification) {
-        Task { @MainActor in
-            refreshTime()
-            refreshDuration()
+    func mediaPlayerTimeChanged(_ aNotification: Notification) {
+        refreshTime()
+        refreshDuration()
+    }
+
+    func mediaPlayerLengthChanged(_ length: Int64) {
+        if length > 0 {
+            durationSeconds = Double(length) / 1000.0
         }
+
+        invalidatePictureInPicturePlaybackState()
     }
 }

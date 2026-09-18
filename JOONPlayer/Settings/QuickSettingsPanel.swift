@@ -28,14 +28,17 @@ struct QuickSettingsPanel: View {
             Divider()
                 .overlay(.white.opacity(0.12))
 
+            pictureInPictureRow
+
+            Divider()
+                .overlay(.white.opacity(0.12))
+
             Button(action: onChooseAnotherVideo) {
                 Label("다른 동영상 열기", systemImage: "folder")
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
-
-            disabledRow(title: "PiP", icon: "pip")
         }
         .padding(16)
         .frame(maxWidth: 330)
@@ -177,15 +180,31 @@ struct QuickSettingsPanel: View {
         }
     }
 
-    private func disabledRow(title: String, icon: String) -> some View {
-        HStack {
-            Label(title, systemImage: icon)
-            Spacer()
-            Text("다음 단계")
-                .font(.caption)
+    private var pictureInPictureRow: some View {
+        Button {
+            player.togglePictureInPicture()
+        } label: {
+            HStack {
+                Label(
+                    player.isPictureInPictureActive ? "PiP 종료" : "PiP 시작",
+                    systemImage: player.isPictureInPictureActive ? "pip.exit" : "pip.enter"
+                )
+
+                Spacer()
+
+                if !player.isPictureInPictureReady {
+                    Text("준비 중")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.45))
+                }
+            }
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .font(.subheadline)
-        .foregroundStyle(.white.opacity(0.38))
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .disabled(!player.isPictureInPictureReady)
+        .opacity(player.isPictureInPictureReady ? 1 : 0.45)
     }
 
     private func rateLabel(_ rate: Float) -> String {

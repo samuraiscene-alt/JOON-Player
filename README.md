@@ -4,12 +4,12 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 4 — 로컬 재생 + 외부 SRT 자막 + 화면 잠금 + 화면비율
+Phase 5 — 로컬 재생 + 외부 SRT 자막 + 화면 잠금 + 화면비율 + PiP
 
 현재 포함된 기능:
 
 - 파일 앱에서 동영상 선택
-- MobileVLCKit 기반 재생 구조
+- VLCKit 4 기반 재생 구조
 - MP4 / MOV / MKV / AVI / M4V / TS / M2TS / WebM / FLV 선택 허용
 - 재생 / 일시정지
 - 10초 뒤로 / 10초 앞으로
@@ -30,9 +30,31 @@ Phase 4 — 로컬 재생 + 외부 SRT 자막 + 화면 잠금 + 화면비율
 - 잠금 상태에는 잠금 해제 버튼만 표시
 - 화면비율: 원본 / 화면 맞춤 / 화면 채우기
 - 세로↔가로 회전 시 현재 화면비율 모드 자동 재적용
+- iOS Picture in Picture(PiP) 시작 / 종료
+- PiP 창의 재생 / 일시정지 / 탐색 상태를 VLC 재생 상태와 연동
 - 미완료 / 일부 손상 영상도 우선 재생 시도
 - 실제 VLC 오류가 발생했을 때만 오류 안내
 - Supabase 사용 안 함
+
+## VLCKit 의존성
+
+PiP를 포함한 현재 구조는 VLCKit 4의 Picture-in-Picture drawable API를 사용합니다.
+
+```ruby
+pod 'VLCKit', '4.0.0a24'
+```
+
+따라서 기존 `MobileVLCKit` 대신 `VLCKit 4.0.0a24`로 고정합니다.
+
+## PiP
+
+빠른 설정의 **PiP 시작**을 누르면 iOS의 화면 속 화면으로 전환합니다.
+
+VLCKit이 PiP 컨트롤러를 준비하기 전에는 버튼이 **준비 중** 상태로 비활성화되고, 준비가 끝나면 활성화됩니다.
+PiP 창에서 재생 / 일시정지 / 탐색을 하면 JOON Player의 VLC 재생 상태에도 그대로 반영됩니다.
+
+실기기 빌드 단계에서는 Xcode의 **Background Modes → Audio, AirPlay, and Picture in Picture**를 활성화해야 합니다.
+현재 저장소에는 아직 Xcode 프로젝트 파일이 없으므로 이 Capability 설정은 Mac/Xcode 프로젝트 생성 단계에서 적용합니다.
 
 ## 화면비율
 
@@ -69,14 +91,6 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 영상은 기본적으로 iOS 파일 앱 / iCloud Drive / 내 iPhone / 외장 저장장치에 있는 파일을 직접 선택해 재생합니다.
 앱 내부로 강제 복사하지 않습니다.
 
-## 의존성
-
-현재 재생 엔진은 MobileVLCKit을 사용합니다.
-
-```ruby
-pod 'MobileVLCKit'
-```
-
 ## 나중에 Mac / Xcode 환경에서 시작하는 방법
 
 1. Xcode에서 iOS App 프로젝트 생성
@@ -87,15 +101,16 @@ pod 'MobileVLCKit'
 2. 이 저장소의 `JOONPlayer` 폴더를 프로젝트에 추가
 3. 저장소 루트의 `Podfile` 사용
 4. CocoaPods 설치 후 `pod install`
-5. 생성된 `.xcworkspace`를 열어 빌드
+5. Xcode → Signing & Capabilities → Background Modes 추가
+6. **Audio, AirPlay, and Picture in Picture** 활성화
+7. 생성된 `.xcworkspace`를 열어 실기기 빌드
 
 ## 다음 개발 순서
 
-1. PiP
-2. 이어보기
-3. 자막 표시 크기 / 위치 세부 설정
-4. 영상 구간 자르기
-5. 필요할 때만 Supabase 기능 검토
+1. 이어보기
+2. 자막 표시 크기 / 위치 세부 설정
+3. 영상 구간 자르기
+4. 필요할 때만 Supabase 기능 검토
 
 ## 설계 원칙
 
