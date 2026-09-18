@@ -649,6 +649,24 @@ final class PlayerViewModel: NSObject, ObservableObject {
         seek(to: currentSeconds + seconds)
     }
 
+    func stepToPreviousFrame() {
+        guard canStepFrames else {
+            errorMessage = "프레임 이동은 영상 출력이 준비된 재생/일시정지 상태에서 사용할 수 있습니다."
+            return
+        }
+
+        mediaPlayer.gotoPreviousFrame()
+    }
+
+    func stepToNextFrame() {
+        guard canStepFrames else {
+            errorMessage = "프레임 이동은 영상 출력이 준비된 재생/일시정지 상태에서 사용할 수 있습니다."
+            return
+        }
+
+        mediaPlayer.gotoNextFrame()
+    }
+
     func seek(to seconds: Double) {
         guard hasMedia else { return }
 
@@ -1246,6 +1264,19 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     var currentMediaURL: URL? {
         securityScopedURL
+    }
+
+    var canStepFrames: Bool {
+        guard
+            hasMedia,
+            !isLoading,
+            !mediaPlayer.videoTracks.isEmpty
+        else {
+            return false
+        }
+
+        return mediaPlayer.state == .playing
+            || mediaPlayer.state == .paused
     }
 
     var selectedAudioTrackName: String {

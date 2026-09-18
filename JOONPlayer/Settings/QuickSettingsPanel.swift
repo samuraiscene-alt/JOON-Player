@@ -22,6 +22,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                frameStepSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 abRepeatSection
 
                 Divider()
@@ -151,6 +156,69 @@ struct QuickSettingsPanel: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private var frameStepSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "프레임 이동",
+                    systemImage: "film.stack"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(
+                    player.isPlaying
+                    ? "누르면 일시정지"
+                    : "정밀 탐색"
+                )
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.46))
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    player.stepToPreviousFrame()
+                } label: {
+                    Label(
+                        "이전 프레임",
+                        systemImage: "backward.end.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!player.canStepFrames)
+                .opacity(player.canStepFrames ? 1 : 0.4)
+
+                Button {
+                    player.stepToNextFrame()
+                } label: {
+                    Label(
+                        "다음 프레임",
+                        systemImage: "forward.end.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(!player.canStepFrames)
+                .opacity(player.canStepFrames ? 1 : 0.4)
+            }
+
+            Text(
+                "재생 중 누르면 VLCKit이 먼저 일시정지한 뒤 한 프레임씩 이동합니다. 이전 프레임은 일부 스트림/코덱에서 지원되지 않을 수 있습니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.44))
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
         }
     }
 
