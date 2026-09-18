@@ -35,6 +35,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                mediaTrackSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 subtitleSection
 
                 Divider()
@@ -62,6 +67,9 @@ struct QuickSettingsPanel: View {
         .frame(maxWidth: 330, maxHeight: 520)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onAppear {
+            player.refreshAvailableTracks()
+        }
     }
 
     private var playbackRateSection: some View {
@@ -267,6 +275,128 @@ struct QuickSettingsPanel: View {
                 }
             }
         }
+    }
+
+    private var mediaTrackSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("오디오 / 자막 트랙", systemImage: "waveform.badge.magnifyingglass")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+            HStack(spacing: 8) {
+                Image(systemName: "speaker.wave.2")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .frame(width: 24)
+
+                Text("오디오")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Spacer()
+
+                if player.audioTrackOptions.count > 1 {
+                    Menu {
+                        ForEach(player.audioTrackOptions) { track in
+                            Button {
+                                player.selectAudioTrack(id: track.id)
+                            } label: {
+                                Label(
+                                    track.name,
+                                    systemImage: track.isSelected
+                                        ? "checkmark"
+                                        : "circle"
+                                )
+                            }
+                        }
+                    } label: {
+                        trackMenuLabel(
+                            title: player.selectedAudioTrackName
+                        )
+                    }
+                } else {
+                    Text(player.selectedAudioTrackName)
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.66))
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "captions.bubble")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .frame(width: 24)
+
+                Text("자막 트랙")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Spacer()
+
+                Menu {
+                    Button {
+                        player.selectTextTrack(id: nil)
+                    } label: {
+                        Label(
+                            "끔",
+                            systemImage: player.textTrackOptions.contains(
+                                where: { $0.isSelected }
+                            )
+                            ? "circle"
+                            : "checkmark"
+                        )
+                    }
+
+                    ForEach(player.textTrackOptions) { track in
+                        Button {
+                            player.selectTextTrack(id: track.id)
+                        } label: {
+                            Label(
+                                track.name,
+                                systemImage: track.isSelected
+                                    ? "checkmark"
+                                    : "circle"
+                            )
+                        }
+                    }
+                } label: {
+                    trackMenuLabel(
+                        title: player.selectedTextTrackName
+                    )
+                }
+                .disabled(player.textTrackOptions.isEmpty)
+                .opacity(player.textTrackOptions.isEmpty ? 0.45 : 1)
+            }
+
+            if
+                player.audioTrackOptions.isEmpty,
+                player.textTrackOptions.isEmpty
+            {
+                Text("현재 파일에서 선택 가능한 추가 트랙을 찾지 못했습니다.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.42))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func trackMenuLabel(
+        title: String
+    ) -> some View {
+        HStack(spacing: 5) {
+            Text(title)
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .background(.white.opacity(0.1))
+        .clipShape(Capsule())
     }
 
     private var subtitleSection: some View {

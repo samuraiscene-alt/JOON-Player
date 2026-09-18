@@ -22,6 +22,12 @@ enum VideoDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct MediaTrackOption: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let isSelected: Bool
+}
+
 struct PlaybackQueueItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
@@ -150,6 +156,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     @Published private(set) var sleepTimerMode: SleepTimerMode = .off
     @Published private(set) var sleepTimerRemainingSeconds: Int?
+
+    @Published private(set) var audioTrackOptions: [MediaTrackOption] = []
+    @Published private(set) var textTrackOptions: [MediaTrackOption] = []
 
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
@@ -481,7 +490,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
         fileName = url.lastPathComponent
 
         clearABRepeat()
-        clearSleepTimer()
+
+        audioTrackOptions = []
+        textTrackOptions = []
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -537,6 +548,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
         fileName = ""
 
         clearABRepeat()
+        clearSleepTimer()
+
+        audioTrackOptions = []
+        textTrackOptions = []
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -672,6 +687,66 @@ final class PlayerViewModel: NSObject, ObservableObject {
         applyVideoDisplayMode()
     }
 
+    func refreshAvailableTracks() {
+        audioTrackOptions = mediaPlayer.audioTracks.enumerated().map {
+            index,
+            track in
+
+            MediaTrackOption(
+                id: track.trackId,
+                name: normalizedTrackName(
+                    track.trackName,
+                    fallback: "오디오 \(index + 1)"
+                ),
+                isSelected: track.isSelected
+            )
+        }
+
+        textTrackOptions = mediaPlayer.textTracks.enumerated().map {
+            index,
+            track in
+
+            MediaTrackOption(
+                id: track.trackId,
+                name: normalizedTrackName(
+                    track.trackName,
+                    fallback: "자막 \(index + 1)"
+                ),
+                isSelected: track.isSelected
+            )
+        }
+    }
+
+    func selectAudioTrack(id: String) {
+        guard let track = mediaPlayer.audioTracks.first(
+            where: { $0.trackId == id }
+        ) else {
+            refreshAvailableTracks()
+            return
+        }
+
+        track.isSelectedExclusively = true
+        refreshAvailableTracks()
+    }
+
+    func selectTextTrack(id: String?) {
+        guard let id else {
+            mediaPlayer.deselectAllTextTracks()
+            refreshAvailableTracks()
+            return
+        }
+
+        guard let track = mediaPlayer.textTracks.first(
+            where: { $0.trackId == id }
+        ) else {
+            refreshAvailableTracks()
+            return
+        }
+
+        track.isSelectedExclusively = true
+        refreshAvailableTracks()
+    }
+
     func loadSubtitle(url: URL) {
         guard hasMedia else {
             errorMessage = "동영상을 먼저 연 뒤 자막을 선택해 주세요."
@@ -680,6 +755,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         queueSubtitle(url: url, isAutomatic: false)
         attachPendingSubtitleIfPossible()
+        refreshAvailableTracks()
     }
 
     func adjustSubtitleDelay(byMilliseconds delta: Int) {
@@ -752,6 +828,16 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     var currentMediaURL: URL? {
         securityScopedURL
+    }
+
+    var selectedAudioTrackName: String {
+        audioTrackOptions.first(where: { $0.isSelected })?.name
+            ?? "자동"
+    }
+
+    var selectedTextTrackName: String {
+        textTrackOptions.first(where: { $0.isSelected })?.name
+            ?? "끔"
     }
 
     var playlistCount: Int {
@@ -858,6 +944,17 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     var formattedSubtitleFontScale: String {
         "\(Int((subtitleFontScale * 100).rounded()))%"
+    }
+
+    private func normalizedTrackName(
+        _ name: String,
+        fallback: String
+    ) -> String {
+        let trimmed = name.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private func configureAudioSession() {
@@ -1164,12 +1261,14 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             applyVideoDisplayMode()
             mediaPlayer.currentSubTitleFontScale = subtitleFontScale
             attachPendingSubtitleIfPossible()
+            refreshAvailableTracks()
 
         case .paused:
             isLoading = false
             isPlaying = false
             persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
+            refreshAvailableTracks()
 
         case .stopping:
             isLoading = false
