@@ -8,6 +8,40 @@ struct AudioEqualizerPresetOption: Identifiable, Equatable {
     let name: String
 }
 
+struct AudioEqualizerBandOption: Identifiable, Equatable {
+    let id: Int
+    let frequency: Float
+    let amplification: Float
+
+    var frequencyText: String {
+        if frequency >= 1_000 {
+            let value = frequency / 1_000
+
+            if value.rounded() == value {
+                return "\(Int(value)) kHz"
+            }
+
+            return String(
+                format: "%.1f kHz",
+                value
+            )
+        }
+
+        return "\(Int(frequency.rounded())) Hz"
+    }
+
+    var amplificationText: String {
+        if abs(amplification) < 0.05 {
+            return "0.0 dB"
+        }
+
+        return String(
+            format: "%+.1f dB",
+            amplification
+        )
+    }
+}
+
 enum AudioOutputMode: String, CaseIterable, Identifiable {
     case automatic
     case stereo
@@ -298,6 +332,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var audioDelayMilliseconds = 0
     @Published var audioOutputMode: AudioOutputMode = .automatic
     @Published private(set) var audioEqualizerPresetIndex: Int?
+    @Published private(set) var audioEqualizerIsCustom = false
+    @Published private(set) var audioEqualizerPreamp: Float = 0
+    @Published private(set) var audioEqualizerBands: [AudioEqualizerBandOption] = []
     @Published var videoDisplayMode: VideoDisplayMode = .original
 
     @Published private(set) var abRepeatStartSeconds: Double?
@@ -353,6 +390,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private var sleepTimerTask: Task<Void, Never>?
     private var sleepTimerDeadline: Date?
+
+    private var activeAudioEqualizer: VLCAudioEqualizer?
 
     private enum PreferenceKey {
         static let subtitleFontScale = "joonplayer.subtitle.fontScale"
@@ -660,6 +699,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
         audioDelayMilliseconds = 0
         audioOutputMode = .automatic
         audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = false
+        audioEqualizerPreamp = 0
+        audioEqualizerBands = []
+        activeAudioEqualizer = nil
+        mediaPlayer.equalizer = nil
         pendingSubtitlePositionRestartSeconds = nil
 
         mediaPlayer.media = makeMedia(url: url)
@@ -727,6 +771,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
         audioDelayMilliseconds = 0
         audioOutputMode = .automatic
         audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = false
+        audioEqualizerPreamp = 0
+        audioEqualizerBands = []
+        activeAudioEqualizer = nil
         mediaPlayer.equalizer = nil
         pendingSubtitlePositionRestartSeconds = nil
     }
@@ -913,8 +961,96 @@ final class PlayerViewModel: NSObject, ObservableObject {
     func setAudioEqualizerPreset(
         index: Int?
     ) {
+        guard let index else {
+            disableAudioEqualizer()
+            return
+        }
+
+        guard let preset = VLCAudioEqualizer.presets.first(
+            where: {
+                Int($0.index) == index
+            }
+        ) else {
+            disableAudioEqualizer()
+            return
+        }
+
+        let equalizer = VLCAudioEqualizer(
+            preset: preset
+        )
+
+        activeAudioEqualizer = equalizer
         audioEqualizerPresetIndex = index
-        applyAudioEqualizer()
+        audioEqualizerIsCustom = false
+        syncAudioEqualizerControls(
+            from: equalizer
+        )
+        mediaPlayer.equalizer = equalizer
+    }
+
+    func setAudioEqualizerPreamp(
+        _ value: Float
+    ) {
+        let equalizer =
+            ensureAudioEqualizerForCustomEditing()
+
+        let clamped = min(max(value, -20), 20)
+
+        audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = true
+        audioEqualizerPreamp = clamped
+        equalizer.preAmplification = clamped
+    }
+
+    func setAudioEqualizerBand(
+        index: Int,
+        amplification: Float
+    ) {
+        let equalizer =
+            ensureAudioEqualizerForCustomEditing()
+
+        guard let band = equalizer.bands.first(
+            where: {
+                Int($0.index) == index
+            }
+        ) else {
+            return
+        }
+
+        let clamped = min(
+            max(amplification, -20),
+            20
+        )
+
+        audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = true
+        band.amplification = clamped
+
+        audioEqualizerBands = audioEqualizerBands.map {
+            option in
+
+            guard option.id == index else {
+                return option
+            }
+
+            return AudioEqualizerBandOption(
+                id: option.id,
+                frequency: option.frequency,
+                amplification: clamped
+            )
+        }
+    }
+
+    func resetAudioEqualizerToFlat() {
+        let equalizer = VLCAudioEqualizer()
+
+        activeAudioEqualizer = equalizer
+        audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = true
+        syncAudioEqualizerControls(
+            from: equalizer
+        )
+        mediaPlayer.equalizer = equalizer
     }
 
     func setAudioDelay(
@@ -1513,6 +1649,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     var selectedAudioEqualizerPresetName: String {
+        if audioEqualizerIsCustom {
+            return "사용자 조절"
+        }
+
         guard let audioEqualizerPresetIndex else {
             return "끔"
         }
@@ -1520,6 +1660,22 @@ final class PlayerViewModel: NSObject, ObservableObject {
         return audioEqualizerPresetOptions.first(
             where: { $0.id == audioEqualizerPresetIndex }
         )?.name ?? "끔"
+    }
+
+    var isAudioEqualizerEnabled: Bool {
+        audioEqualizerIsCustom
+            || audioEqualizerPresetIndex != nil
+    }
+
+    var formattedAudioEqualizerPreamp: String {
+        if abs(audioEqualizerPreamp) < 0.05 {
+            return "0.0 dB"
+        }
+
+        return String(
+            format: "%+.1f dB",
+            audioEqualizerPreamp
+        )
     }
 
     var canAddPlaybackBookmark: Bool {
@@ -1839,25 +1995,50 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     private func applyAudioEqualizer() {
-        guard let audioEqualizerPresetIndex else {
-            mediaPlayer.equalizer = nil
-            return
+        mediaPlayer.equalizer =
+            activeAudioEqualizer
+    }
+
+    private func disableAudioEqualizer() {
+        audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = false
+        audioEqualizerPreamp = 0
+        audioEqualizerBands = []
+        activeAudioEqualizer = nil
+        mediaPlayer.equalizer = nil
+    }
+
+    private func ensureAudioEqualizerForCustomEditing()
+        -> VLCAudioEqualizer
+    {
+        if let activeAudioEqualizer {
+            return activeAudioEqualizer
         }
 
-        guard let preset = VLCAudioEqualizer.presets.first(
-            where: {
-                Int($0.index)
-                    == audioEqualizerPresetIndex
-            }
-        ) else {
-            self.audioEqualizerPresetIndex = nil
-            mediaPlayer.equalizer = nil
-            return
-        }
-
-        mediaPlayer.equalizer = VLCAudioEqualizer(
-            preset: preset
+        let equalizer = VLCAudioEqualizer()
+        activeAudioEqualizer = equalizer
+        mediaPlayer.equalizer = equalizer
+        syncAudioEqualizerControls(
+            from: equalizer
         )
+        return equalizer
+    }
+
+    private func syncAudioEqualizerControls(
+        from equalizer: VLCAudioEqualizer
+    ) {
+        audioEqualizerPreamp =
+            equalizer.preAmplification
+
+        audioEqualizerBands = equalizer.bands.map {
+            band in
+
+            AudioEqualizerBandOption(
+                id: Int(band.index),
+                frequency: band.frequency,
+                amplification: band.amplification
+            )
+        }
     }
 
     private func configureAudioSession() {

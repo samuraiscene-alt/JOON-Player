@@ -793,7 +793,7 @@ struct QuickSettingsPanel: View {
     }
 
     private var equalizerSection: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label(
                     "이퀄라이저",
@@ -819,7 +819,8 @@ struct QuickSettingsPanel: View {
                     Label(
                         "끔",
                         systemImage:
-                            player.audioEqualizerPresetIndex == nil
+                            !player.audioEqualizerIsCustom
+                            && player.audioEqualizerPresetIndex == nil
                             ? "checkmark"
                             : "circle"
                     )
@@ -838,7 +839,8 @@ struct QuickSettingsPanel: View {
                         Label(
                             preset.name,
                             systemImage:
-                                player.audioEqualizerPresetIndex
+                                !player.audioEqualizerIsCustom
+                                && player.audioEqualizerPresetIndex
                                     == preset.id
                                 ? "checkmark"
                                 : "circle"
@@ -873,8 +875,44 @@ struct QuickSettingsPanel: View {
                 .clipShape(Capsule())
             }
 
+            if player.isAudioEqualizerEnabled {
+                HStack {
+                    Text("세부 조절")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.7))
+
+                    Spacer()
+
+                    Button {
+                        player.resetAudioEqualizerToFlat()
+                    } label: {
+                        Label(
+                            "평탄화",
+                            systemImage: "arrow.counterclockwise"
+                        )
+                        .font(.caption2)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white.opacity(0.68))
+                }
+
+                equalizerPreampControl
+
+                VStack(spacing: 8) {
+                    ForEach(
+                        player.audioEqualizerBands
+                    ) { band in
+                        equalizerBandControl(
+                            band
+                        )
+                    }
+                }
+            }
+
             Text(
-                "VLCKit에 포함된 프리셋을 그대로 사용합니다. 끔을 선택하면 원본 음색으로 돌아갑니다."
+                player.isAudioEqualizerEnabled
+                ? "프리셋을 선택한 뒤 프리앰프나 밴드를 움직이면 사용자 조절 모드로 전환됩니다."
+                : "VLCKit에 포함된 프리셋을 선택하거나 끔으로 원본 음색을 유지할 수 있습니다."
             )
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.44))
@@ -882,6 +920,87 @@ struct QuickSettingsPanel: View {
                 horizontal: false,
                 vertical: true
             )
+        }
+    }
+
+    private var equalizerPreampControl: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("프리앰프")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Spacer()
+
+                Text(player.formattedAudioEqualizerPreamp)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.66))
+            }
+
+            Slider(
+                value: Binding(
+                    get: {
+                        Double(
+                            player.audioEqualizerPreamp
+                        )
+                    },
+                    set: {
+                        player.setAudioEqualizerPreamp(
+                            Float($0)
+                        )
+                    }
+                ),
+                in: -20...20,
+                step: 0.5
+            )
+            .tint(.white)
+        }
+    }
+
+    private func equalizerBandControl(
+        _ band: AudioEqualizerBandOption
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(band.frequencyText)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Spacer()
+
+                Text(
+                    player.audioEqualizerBands.first(
+                        where: { $0.id == band.id }
+                    )?.amplificationText
+                        ?? band.amplificationText
+                )
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.66))
+            }
+
+            Slider(
+                value: Binding(
+                    get: {
+                        Double(
+                            player.audioEqualizerBands.first(
+                                where: {
+                                    $0.id == band.id
+                                }
+                            )?.amplification
+                                ?? band.amplification
+                        )
+                    },
+                    set: {
+                        player.setAudioEqualizerBand(
+                            index: band.id,
+                            amplification: Float($0)
+                        )
+                    }
+                ),
+                in: -20...20,
+                step: 0.5
+            )
+            .tint(.white)
         }
     }
 
