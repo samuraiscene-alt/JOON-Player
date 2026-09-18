@@ -8,6 +8,9 @@ private enum QuickSettingsGroup {
 }
 
 struct QuickSettingsPanel: View {
+    @Environment(\.dynamicTypeSize)
+    private var dynamicTypeSize
+
     @ObservedObject var player: PlayerViewModel
     let onChooseAnotherVideo: () -> Void
     let onChooseSubtitle: () -> Void
@@ -126,7 +129,10 @@ struct QuickSettingsPanel: View {
 
                     Spacer(minLength: 8)
 
-                    if let summary {
+                    if
+                        let summary,
+                        !dynamicTypeSize.isAccessibilitySize
+                    {
                         Text(summary)
                             .font(.caption2)
                             .foregroundStyle(.white.opacity(0.48))
@@ -144,9 +150,24 @@ struct QuickSettingsPanel: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 11)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("\(title) 설정")
+            .accessibilityValue(
+                [
+                    summary,
+                    isExpanded ? "펼쳐짐" : "접힘"
+                ]
+                .compactMap { $0 }
+                .joined(separator: ", ")
+            )
+            .accessibilityHint(
+                isExpanded
+                ? "두 번 탭하면 설정을 접습니다."
+                : "두 번 탭하면 설정을 펼칩니다."
+            )
 
             if isExpanded {
                 Divider()
@@ -223,6 +244,22 @@ struct QuickSettingsPanel: View {
     private var groupDivider: some View {
         Divider()
             .overlay(.white.opacity(0.1))
+            .accessibilityHidden(true)
+    }
+
+    private var choiceLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(
+                VStackLayout(
+                    alignment: .leading,
+                    spacing: 7
+                )
+            )
+        }
+
+        return AnyLayout(
+            HStackLayout(spacing: 7)
+        )
     }
 
     private var mediaInfoRow: some View {
@@ -247,6 +284,7 @@ struct QuickSettingsPanel: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
+        .frame(minHeight: 44)
     }
 
     private var snapshotRow: some View {
@@ -262,6 +300,7 @@ struct QuickSettingsPanel: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
+        .frame(minHeight: 44)
     }
 
     private var chooseVideoRow: some View {
@@ -277,6 +316,7 @@ struct QuickSettingsPanel: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
+        .frame(minHeight: 44)
     }
 
     private var playbackRateSection: some View {
@@ -285,7 +325,7 @@ struct QuickSettingsPanel: View {
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.78))
 
-            HStack(spacing: 7) {
+            choiceLayout {
                 ForEach(rates, id: \.self) { rate in
                     Button {
                         player.setPlaybackRate(rate)
@@ -307,6 +347,14 @@ struct QuickSettingsPanel: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .frame(
+                        maxWidth:
+                            dynamicTypeSize.isAccessibilitySize
+                            ? .infinity
+                            : nil,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
                 }
             }
         }
@@ -345,6 +393,7 @@ struct QuickSettingsPanel: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .frame(minHeight: 44)
                 .disabled(!player.canStepFrames)
                 .opacity(player.canStepFrames ? 1 : 0.4)
 
@@ -359,6 +408,7 @@ struct QuickSettingsPanel: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
+                .frame(minHeight: 44)
                 .disabled(!player.canStepFrames)
                 .opacity(player.canStepFrames ? 1 : 0.4)
             }
@@ -468,9 +518,10 @@ struct QuickSettingsPanel: View {
                                 Image(systemName: "trash")
                                     .font(.caption)
                                     .frame(
-                                        width: 30,
-                                        height: 30
+                                        width: 44,
+                                        height: 44
                                     )
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(
@@ -609,7 +660,7 @@ struct QuickSettingsPanel: View {
                 }
             }
 
-            HStack(spacing: 7) {
+            choiceLayout {
                 ForEach(
                     [
                         SleepTimerMode.minutes15,
@@ -638,6 +689,14 @@ struct QuickSettingsPanel: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .frame(
+                        maxWidth:
+                            dynamicTypeSize.isAccessibilitySize
+                            ? .infinity
+                            : nil,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
                 }
             }
 
@@ -899,7 +958,7 @@ struct QuickSettingsPanel: View {
                     .foregroundStyle(.white.opacity(0.48))
             }
 
-            HStack(spacing: 6) {
+            choiceLayout {
                 ForEach(AudioOutputMode.allCases) { mode in
                     Button {
                         player.setAudioOutputMode(mode)
@@ -921,6 +980,14 @@ struct QuickSettingsPanel: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .frame(
+                        maxWidth:
+                            dynamicTypeSize.isAccessibilitySize
+                            ? .infinity
+                            : nil,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
                 }
             }
 
@@ -1098,6 +1165,13 @@ struct QuickSettingsPanel: View {
                 step: 0.5
             )
             .tint(.white)
+            .accessibilityLabel("이퀄라이저 프리앰프")
+            .accessibilityValue(
+                player.formattedAudioEqualizerPreamp
+            )
+            .accessibilityHint(
+                "위아래로 쓸어 프리앰프를 조절합니다."
+            )
         }
     }
 
@@ -1145,6 +1219,18 @@ struct QuickSettingsPanel: View {
                 step: 0.5
             )
             .tint(.white)
+            .accessibilityLabel(
+                "\(band.frequencyText) 이퀄라이저 밴드"
+            )
+            .accessibilityValue(
+                player.audioEqualizerBands.first(
+                    where: { $0.id == band.id }
+                )?.amplificationText
+                    ?? band.amplificationText
+            )
+            .accessibilityHint(
+                "위아래로 쓸어 증폭값을 조절합니다."
+            )
         }
     }
 
@@ -1160,7 +1246,8 @@ struct QuickSettingsPanel: View {
                         player.playPreviousChapter()
                     } label: {
                         Image(systemName: "backward.end.fill")
-                            .frame(width: 36, height: 34)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .disabled(!player.canPlayPreviousChapter)
                     .opacity(
@@ -1213,7 +1300,8 @@ struct QuickSettingsPanel: View {
                         player.playNextChapter()
                     } label: {
                         Image(systemName: "forward.end.fill")
-                            .frame(width: 36, height: 34)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                     .disabled(!player.canPlayNextChapter)
                     .opacity(
@@ -1365,7 +1453,7 @@ struct QuickSettingsPanel: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.58))
 
-            HStack(spacing: 7) {
+            choiceLayout {
                 ForEach(SubtitleVerticalPosition.allCases) { position in
                     Button {
                         player.setSubtitleVerticalPosition(position)
@@ -1387,6 +1475,14 @@ struct QuickSettingsPanel: View {
                             .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
+                    .frame(
+                        maxWidth:
+                            dynamicTypeSize.isAccessibilitySize
+                            ? .infinity
+                            : nil,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
                 }
             }
         }
@@ -1417,6 +1513,12 @@ struct QuickSettingsPanel: View {
         .foregroundStyle(.white)
         .disabled(!player.isPictureInPictureReady)
         .opacity(player.isPictureInPictureReady ? 1 : 0.45)
+        .frame(minHeight: 44)
+        .accessibilityHint(
+            player.isPictureInPictureActive
+            ? "화면 속 화면 재생을 종료합니다."
+            : "다른 앱 위에서 영상을 계속 재생합니다."
+        )
     }
 
     private var repairRow: some View {
@@ -1439,6 +1541,10 @@ struct QuickSettingsPanel: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.white)
+        .frame(minHeight: 44)
+        .accessibilityHint(
+            "현재 영상을 새 컨테이너로 복구하거나 재인코딩합니다."
+        )
     }
 
     private func rateLabel(_ rate: Float) -> String {

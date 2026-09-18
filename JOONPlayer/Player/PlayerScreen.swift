@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 struct PlayerScreen: View {
+    @Environment(\.accessibilityVoiceOverEnabled)
+    private var isVoiceOverEnabled
+
     @ObservedObject var player: PlayerViewModel
     @ObservedObject var savedPlaylistStore: SavedPlaylistStore
     let isLandscape: Bool
@@ -49,6 +52,7 @@ struct PlayerScreen: View {
 
             VLCVideoView(player: player)
                 .background(Color.black)
+                .accessibilityHidden(true)
 
             HardwareKeyboardShortcutReceiver(
                 isEnabled: hardwareKeyboardShortcutsEnabled,
@@ -156,6 +160,14 @@ struct PlayerScreen: View {
             }
             scheduleAutoHideIfNeeded()
         }
+        .onChange(of: isVoiceOverEnabled) { _, enabled in
+            if enabled {
+                controlsVisible = true
+                autoHideTask?.cancel()
+            } else {
+                scheduleAutoHideIfNeeded()
+            }
+        }
         .sheet(isPresented: $showTrimEditor) {
             TrimEditorView(player: player)
         }
@@ -201,6 +213,7 @@ struct PlayerScreen: View {
     private var hardwareKeyboardShortcutsEnabled: Bool {
         player.hasMedia
             && !player.isLoading
+            && !isVoiceOverEnabled
             && !isControlsLocked
             && !showSettings
             && !showVolumePopup
@@ -220,6 +233,8 @@ struct PlayerScreen: View {
         .contentShape(Rectangle())
         .simultaneousGesture(horizontalSeekDragGesture)
         .simultaneousGesture(temporarySpeedPressGesture)
+        .allowsHitTesting(!isVoiceOverEnabled)
+        .accessibilityHidden(true)
         .ignoresSafeArea()
     }
 
@@ -523,6 +538,7 @@ struct PlayerScreen: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("화면 잠금 해제")
+                .accessibilityHint("재생 컨트롤을 다시 사용할 수 있게 합니다.")
 
                 Spacer()
             }
@@ -546,11 +562,13 @@ struct PlayerScreen: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white)
             .accessibilityLabel("최근 파일 화면으로 돌아가기")
+            .accessibilityHint("현재 영상을 닫고 홈 화면으로 이동합니다.")
 
             Text(player.fileName)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white)
                 .lineLimit(1)
+                .accessibilityLabel("현재 영상 \(player.fileName)")
 
             Spacer()
 
@@ -569,6 +587,7 @@ struct PlayerScreen: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
                 .accessibilityLabel("재생 목록")
+                .accessibilityHint("현재 재생 목록을 엽니다.")
             }
 
             Button {
@@ -587,6 +606,7 @@ struct PlayerScreen: View {
             .disabled(player.durationSeconds <= 0)
             .opacity(player.durationSeconds > 0 ? 1 : 0.35)
             .accessibilityLabel("영상 자르기")
+            .accessibilityHint("현재 영상의 시작과 끝 구간을 선택해 새 파일로 저장합니다.")
 
             Button {
                 showVolumePopup = false
@@ -600,6 +620,16 @@ struct PlayerScreen: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white)
+            .accessibilityLabel(
+                showSettings
+                ? "빠른 설정 닫기"
+                : "빠른 설정 열기"
+            )
+            .accessibilityHint(
+                showSettings
+                ? "빠른 설정 패널을 닫습니다."
+                : "재생, 오디오, 자막 및 기타 설정을 엽니다."
+            )
         }
     }
 
@@ -1196,6 +1226,7 @@ struct PlayerScreen: View {
 
         guard
             !isControlsLocked,
+            !isVoiceOverEnabled,
             isLandscape,
             player.isPlaying,
             !showSettings,
