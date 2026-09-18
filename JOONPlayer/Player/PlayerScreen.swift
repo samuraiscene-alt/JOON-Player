@@ -9,6 +9,7 @@ struct PlayerScreen: View {
     @State private var controlsVisible = true
     @State private var showVolumePopup = false
     @State private var showSettings = false
+    @State private var showTrimEditor = false
     @State private var isControlsLocked = false
     @State private var autoHideTask: Task<Void, Never>?
 
@@ -51,6 +52,9 @@ struct PlayerScreen: View {
                 controlsVisible = true
             }
             scheduleAutoHideIfNeeded()
+        }
+        .sheet(isPresented: $showTrimEditor) {
+            TrimEditorView(player: player)
         }
         .onDisappear {
             autoHideTask?.cancel()
@@ -147,6 +151,23 @@ struct PlayerScreen: View {
                 .lineLimit(1)
 
             Spacer()
+
+            Button {
+                showVolumePopup = false
+                showSettings = false
+                keepControlsVisible()
+                showTrimEditor = true
+            } label: {
+                Image(systemName: "scissors")
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .disabled(player.durationSeconds <= 0)
+            .opacity(player.durationSeconds > 0 ? 1 : 0.35)
+            .accessibilityLabel("영상 자르기")
 
             Button {
                 showVolumePopup = false

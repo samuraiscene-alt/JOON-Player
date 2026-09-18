@@ -359,6 +359,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
         errorMessage = error
     }
 
+    var currentMediaURL: URL? {
+        securityScopedURL
+    }
+
     var formattedCurrentTime: String {
         Self.formatTime(currentSeconds)
     }
