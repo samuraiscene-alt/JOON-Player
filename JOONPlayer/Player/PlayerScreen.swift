@@ -25,6 +25,7 @@ struct PlayerScreen: View {
     @State private var showSnapshotShareSheet = false
     @State private var snapshotURL: URL?
     @State private var isCapturingSnapshot = false
+    @State private var snapshotCaptureTask: Task<Void, Never>?
     @State private var showPlaylist = false
     @State private var isControlsLocked = false
     @State private var seekGestureFeedback: SeekGestureFeedback?
@@ -197,6 +198,9 @@ struct PlayerScreen: View {
             )
         }
         .onDisappear {
+            snapshotCaptureTask?.cancel()
+            snapshotCaptureTask = nil
+
             seekFeedbackTask?.cancel()
             horizontalSeekFeedbackTask?.cancel()
             verticalAdjustmentFeedbackTask?.cancel()
@@ -1323,25 +1327,41 @@ struct PlayerScreen: View {
     private func captureSnapshot() {
         guard !isCapturingSnapshot else { return }
 
-        isCapturingSnapshot = true
-        snapshotURL = nil
+        snapshotCaptureTask?.cancel()
+        cleanupSnapshot()
 
-        Task {
+        isCapturingSnapshot = true
+
+        snapshotCaptureTask = Task {
             do {
                 let url = try await player
                     .captureCurrentFrameSnapshot()
 
+                if Task.isCancelled {
+                    try? FileManager.default.removeItem(
+                        at: url
+                    )
+                    return
+                }
+
                 await MainActor.run {
                     snapshotURL = url
                     isCapturingSnapshot = false
+                    snapshotCaptureTask = nil
                     showSnapshotShareSheet = true
                 }
             } catch {
+                let wasCancelled = Task.isCancelled
+
                 await MainActor.run {
                     isCapturingSnapshot = false
-                    player.present(
-                        error: error.localizedDescription
-                    )
+                    snapshotCaptureTask = nil
+
+                    if !wasCancelled {
+                        player.present(
+                            error: error.localizedDescription
+                        )
+                    }
                 }
             }
         }

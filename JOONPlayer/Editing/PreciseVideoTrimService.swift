@@ -242,11 +242,17 @@ enum PreciseVideoTrimService {
                     continuation.resume(returning: outputURL)
 
                 case .cancelled:
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
                     continuation.resume(
                         throwing: PreciseTrimError.cancelled
                     )
 
                 case .failed:
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
                     continuation.resume(
                         throwing: PreciseTrimError.failed(
                             localExporter.error?.localizedDescription
@@ -254,6 +260,9 @@ enum PreciseVideoTrimService {
                     )
 
                 default:
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
                     continuation.resume(
                         throwing: PreciseTrimError.failed(nil)
                     )

@@ -7,6 +7,7 @@ struct VideoRepairView: View {
 
     @State private var repairMode: VideoRepairMode = .quickRemux
     @State private var isRepairing = false
+    @State private var repairTask: Task<Void, Never>?
     @State private var repairedURL: URL?
     @State private var showShareSheet = false
     @State private var errorMessage: String?
@@ -50,7 +51,18 @@ struct VideoRepairView: View {
             showTechnicalDetails = false
             didCopyTechnicalLog = false
         }
-        .sheet(isPresented: $showShareSheet) {
+        .onDisappear {
+            repairTask?.cancel()
+            repairTask = nil
+
+            if !showShareSheet {
+                cleanupRepairedOutput()
+            }
+        }
+        .sheet(
+            isPresented: $showShareSheet,
+            onDismiss: cleanupRepairedOutput
+        ) {
             if let repairedURL {
                 RepairShareSheet(items: [repairedURL])
             }
@@ -309,40 +321,75 @@ struct VideoRepairView: View {
             player.togglePlayback()
         }
 
+        cleanupRepairedOutput()
         failureSummary = nil
         showTechnicalDetails = false
         didCopyTechnicalLog = false
         isRepairing = true
 
-        Task {
+        repairTask = Task {
             do {
                 let url = try await VideoRepairService.repair(
                     sourceURL: sourceURL,
                     mode: repairMode
                 )
 
+                if Task.isCancelled {
+                    try? FileManager.default.removeItem(
+                        at: url
+                    )
+                    return
+                }
+
                 await MainActor.run {
                     repairedURL = url
                     isRepairing = false
+                    repairTask = nil
                     showShareSheet = true
                 }
             } catch let repairError as VideoRepairService.RepairError {
+                let wasCancelled = Task.isCancelled
+
                 await MainActor.run {
                     isRepairing = false
+                    repairTask = nil
 
-                    if let report = repairError.failureSummary {
+                    guard !wasCancelled else { return }
+
+                    if let report =
+                        repairError.failureSummary
+                    {
                         failureSummary = report
                     } else {
-                        errorMessage = repairError.localizedDescription
+                        errorMessage =
+                            repairError.localizedDescription
                     }
                 }
             } catch {
+                let wasCancelled = Task.isCancelled
+
                 await MainActor.run {
                     isRepairing = false
-                    errorMessage = error.localizedDescription
+                    repairTask = nil
+
+                    if !wasCancelled {
+                        errorMessage =
+                            error.localizedDescription
+                    }
                 }
             }
         }
+    }
+
+    private func cleanupRepairedOutput() {
+        if let repairedURL {
+            try? FileManager.default.removeItem(
+                at: repairedURL
+            )
+        }
+
+        repairedURL = nil
+        showShareSheet = false
     }
 }
 

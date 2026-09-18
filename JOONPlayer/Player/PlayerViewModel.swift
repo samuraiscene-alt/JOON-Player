@@ -460,8 +460,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     deinit {
         sleepTimerTask?.cancel()
         mediaPlayer.stop()
-        releaseSubtitleScope()
-        releaseSecurityScope()
+        releaseCurrentFileAccess()
     }
 
     func attach(to drawable: AnyObject) {
@@ -689,9 +688,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         suppressAutomaticAdvance = true
         mediaPlayer.stop()
-
-        releaseSubtitleScope()
-        releaseSecurityScope()
+        releaseCurrentFileAccess()
 
         securityScopedURL = url
         isUsingSecurityScope = url.startAccessingSecurityScopedResource()
@@ -748,8 +745,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         mediaPlayer.stop()
-        releaseSubtitleScope()
-        releaseSecurityScope()
+        releaseCurrentFileAccess()
 
         currentResumeIdentifier = nil
         pendingResumeSeconds = nil
@@ -1209,22 +1205,33 @@ final class PlayerViewModel: NSObject, ObservableObject {
             andHeight: 0
         )
 
-        for _ in 0..<40 {
-            try await Task.sleep(for: .milliseconds(50))
+        do {
+            for _ in 0..<40 {
+                try Task.checkCancellation()
+                try await Task.sleep(
+                    for: .milliseconds(50)
+                )
 
-            if
-                FileManager.default.fileExists(
-                    atPath: outputURL.path
-                ),
-                let attributes = try? FileManager.default
-                    .attributesOfItem(
+                if
+                    FileManager.default.fileExists(
                         atPath: outputURL.path
                     ),
-                let fileSize = attributes[.size] as? NSNumber,
-                fileSize.int64Value > 0
-            {
-                return outputURL
+                    let attributes = try? FileManager.default
+                        .attributesOfItem(
+                            atPath: outputURL.path
+                        ),
+                    let fileSize =
+                        attributes[.size] as? NSNumber,
+                    fileSize.int64Value > 0
+                {
+                    return outputURL
+                }
             }
+        } catch {
+            try? FileManager.default.removeItem(
+                at: outputURL
+            )
+            throw error
         }
 
         try? FileManager.default.removeItem(at: outputURL)
@@ -2479,6 +2486,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
             candidate.pathExtension.caseInsensitiveCompare("srt") == .orderedSame &&
             candidate.deletingPathExtension().lastPathComponent.caseInsensitiveCompare(videoStem) == .orderedSame
         }
+    }
+
+    private func releaseCurrentFileAccess() {
+        releaseSubtitleScope()
+        releaseSecurityScope()
     }
 
     private func releaseSubtitleScope() {

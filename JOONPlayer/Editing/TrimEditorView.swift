@@ -13,6 +13,7 @@ struct TrimEditorView: View {
     @State private var didInitializeRange = false
     @State private var isPreviewing = false
     @State private var isExporting = false
+    @State private var exportTask: Task<Void, Never>?
     @State private var exportedURL: URL?
     @State private var showShareSheet = false
     @State private var errorMessage: String?
@@ -45,10 +46,12 @@ struct TrimEditorView: View {
                         stopPreviewIfNeeded()
                         dismiss()
                     }
+                    .disabled(isExporting)
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .interactiveDismissDisabled(isExporting)
         .onAppear {
             initializeRangeIfNeeded()
         }
@@ -67,8 +70,17 @@ struct TrimEditorView: View {
         }
         .onDisappear {
             stopPreviewIfNeeded()
+            exportTask?.cancel()
+            exportTask = nil
+
+            if !showShareSheet {
+                cleanupExportedOutput()
+            }
         }
-        .sheet(isPresented: $showShareSheet) {
+        .sheet(
+            isPresented: $showShareSheet,
+            onDismiss: cleanupExportedOutput
+        ) {
             if let exportedURL {
                 ActivityShareSheet(items: [exportedURL])
             }
@@ -417,9 +429,10 @@ struct TrimEditorView: View {
             player.togglePlayback()
         }
 
+        cleanupExportedOutput()
         isExporting = true
 
-        Task {
+        exportTask = Task {
             do {
                 let url = try await VideoTrimCoordinator.export(
                     sourceURL: sourceURL,
@@ -429,18 +442,44 @@ struct TrimEditorView: View {
                     quality: preciseQuality
                 )
 
+                if Task.isCancelled {
+                    try? FileManager.default.removeItem(
+                        at: url
+                    )
+                    return
+                }
+
                 await MainActor.run {
                     exportedURL = url
                     isExporting = false
+                    exportTask = nil
                     showShareSheet = true
                 }
             } catch {
+                let wasCancelled = Task.isCancelled
+
                 await MainActor.run {
                     isExporting = false
-                    errorMessage = error.localizedDescription
+                    exportTask = nil
+
+                    if !wasCancelled {
+                        errorMessage =
+                            error.localizedDescription
+                    }
                 }
             }
         }
+    }
+
+    private func cleanupExportedOutput() {
+        if let exportedURL {
+            try? FileManager.default.removeItem(
+                at: exportedURL
+            )
+        }
+
+        exportedURL = nil
+        showShareSheet = false
     }
 
     private func timeText(_ seconds: Double) -> String {
@@ -567,15 +606,28 @@ enum VideoTrimService {
                     continuation.resume(returning: outputURL)
 
                 case .cancelled:
-                    continuation.resume(throwing: TrimError.cancelled)
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
+                    continuation.resume(
+                        throwing: TrimError.cancelled
+                    )
 
                 case .failed:
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
                     continuation.resume(
                         throwing: TrimError.failed(localExporter.error)
                     )
 
                 default:
-                    continuation.resume(throwing: TrimError.unknown)
+                    try? FileManager.default.removeItem(
+                        at: outputURL
+                    )
+                    continuation.resume(
+                        throwing: TrimError.unknown
+                    )
                 }
             }
         }
