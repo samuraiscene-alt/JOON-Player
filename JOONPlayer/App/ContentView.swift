@@ -3,7 +3,10 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
+
     @StateObject private var player = PlayerViewModel()
+    @StateObject private var recentStore = RecentMediaStore()
+
     @State private var isVideoPickerPresented = false
     @State private var isSubtitlePickerPresented = false
 
@@ -22,6 +25,9 @@ struct ContentView: View {
                     PlayerScreen(
                         player: player,
                         isLandscape: isLandscape,
+                        onCloseVideo: {
+                            player.closeMedia()
+                        },
                         onChooseAnotherVideo: {
                             isVideoPickerPresented = true
                         },
@@ -30,9 +36,19 @@ struct ContentView: View {
                         }
                     )
                 } else {
-                    EmptyPlayerView {
-                        isVideoPickerPresented = true
-                    }
+                    EmptyPlayerView(
+                        recentItems: recentStore.items,
+                        chooseVideo: {
+                            isVideoPickerPresented = true
+                        },
+                        openRecent: openRecent,
+                        removeRecent: { item in
+                            recentStore.remove(item)
+                        },
+                        clearRecent: {
+                            recentStore.removeAll()
+                        }
+                    )
                 }
             }
         }
@@ -44,10 +60,14 @@ struct ContentView: View {
             switch result {
             case .success(let urls):
                 guard let url = urls.first else { return }
+
+                try? recentStore.remember(url: url)
                 player.load(url: url)
 
             case .failure(let error):
-                player.present(error: "파일을 열 수 없습니다.\n\(error.localizedDescription)")
+                player.present(
+                    error: "파일을 열 수 없습니다.\n\(error.localizedDescription)"
+                )
             }
         }
         .fileImporter(
@@ -61,7 +81,9 @@ struct ContentView: View {
                 player.loadSubtitle(url: url)
 
             case .failure(let error):
-                player.present(error: "자막 파일을 열 수 없습니다.\n\(error.localizedDescription)")
+                player.present(
+                    error: "자막 파일을 열 수 없습니다.\n\(error.localizedDescription)"
+                )
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -83,13 +105,50 @@ struct ContentView: View {
             Text(player.errorMessage ?? "")
         }
     }
+
+    private func openRecent(_ item: RecentMediaStore.Item) {
+        do {
+            let url = try recentStore.resolve(item)
+            player.load(url: url)
+        } catch {
+            player.present(error: error.localizedDescription)
+        }
+    }
 }
 
 private struct EmptyPlayerView: View {
+    let recentItems: [RecentMediaStore.Item]
     let chooseVideo: () -> Void
+    let openRecent: (RecentMediaStore.Item) -> Void
+    let removeRecent: (RecentMediaStore.Item) -> Void
+    let clearRecent: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
+        ScrollView {
+            VStack(spacing: 22) {
+                header
+
+                Button(action: chooseVideo) {
+                    Label("동영상 선택", systemImage: "folder")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+
+                if !recentItems.isEmpty {
+                    recentSection
+                }
+            }
+            .frame(maxWidth: 620)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 30)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var header: some View {
+        VStack(spacing: 14) {
             Image(systemName: "play.rectangle.on.rectangle")
                 .font(.system(size: 56, weight: .light))
                 .foregroundStyle(.white.opacity(0.92))
@@ -98,19 +157,99 @@ private struct EmptyPlayerView: View {
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
 
-            Text("파일 앱에 있는 동영상을 선택해 재생합니다.")
+            Text("파일 앱의 동영상을 열거나 최근 파일에서 바로 이어서 재생합니다.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.64))
                 .multilineTextAlignment(.center)
-
-            Button(action: chooseVideo) {
-                Label("동영상 선택", systemImage: "folder")
-                    .font(.headline)
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.borderedProminent)
         }
-        .padding(24)
+    }
+
+    private var recentSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("최근 파일", systemImage: "clock.arrow.circlepath")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Button("모두 지우기", action: clearRecent)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(recentItems.enumerated()), id: \.element.id) {
+                    index,
+                    item in
+
+                    HStack(spacing: 12) {
+                        Button {
+                            openRecent(item)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "film")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.white.opacity(0.72))
+                                    .frame(width: 28)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(item.fileName)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+
+                                    Text(
+                                        item.lastOpenedAt,
+                                        format: .dateTime
+                                            .month()
+                                            .day()
+                                            .hour()
+                                            .minute()
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.46))
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            removeRecent(item)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white.opacity(0.48))
+                                .frame(width: 36, height: 36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("최근 파일에서 삭제")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+
+                    if index < recentItems.count - 1 {
+                        Divider()
+                            .overlay(.white.opacity(0.08))
+                            .padding(.leading, 54)
+                    }
+                }
+            }
+            .background(.ultraThinMaterial)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+        }
     }
 }

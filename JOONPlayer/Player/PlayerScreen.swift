@@ -3,6 +3,7 @@ import SwiftUI
 struct PlayerScreen: View {
     @ObservedObject var player: PlayerViewModel
     let isLandscape: Bool
+    let onCloseVideo: () -> Void
     let onChooseAnotherVideo: () -> Void
     let onChooseSubtitle: () -> Void
 
@@ -152,7 +153,21 @@ struct PlayerScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
+            Button {
+                showVolumePopup = false
+                showSettings = false
+                onCloseVideo()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: 40, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+            .accessibilityLabel("최근 파일 화면으로 돌아가기")
+
             Text(player.fileName)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.white)

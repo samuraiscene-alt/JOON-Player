@@ -218,6 +218,38 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.play()
     }
 
+    func closeMedia() {
+        persistPlaybackProgress()
+
+        if isPictureInPictureActive {
+            pictureInPictureController?.stopPictureInPicture()
+        }
+
+        mediaPlayer.stop()
+        releaseSubtitleScope()
+        releaseSecurityScope()
+
+        currentResumeIdentifier = nil
+        pendingResumeSeconds = nil
+        lastSavedResumeSecond = -1
+
+        pictureInPictureController = nil
+        isPictureInPictureReady = false
+        isPictureInPictureActive = false
+
+        hasMedia = false
+        isPlaying = false
+        isLoading = false
+        currentSeconds = 0
+        durationSeconds = 0
+        fileName = ""
+
+        subtitleName = nil
+        subtitleWasAutoLoaded = false
+        subtitleDelayMilliseconds = 0
+        pendingSubtitlePositionRestartSeconds = nil
+    }
+
     func togglePlayback() {
         guard hasMedia else { return }
 
