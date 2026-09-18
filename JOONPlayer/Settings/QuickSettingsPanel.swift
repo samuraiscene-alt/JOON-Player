@@ -25,6 +25,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                sleepTimerSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 videoDisplaySection
 
                 Divider()
@@ -167,6 +172,67 @@ struct QuickSettingsPanel: View {
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.45))
             .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var sleepTimerSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label("취침 타이머", systemImage: "moon.zzz")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                if player.sleepTimerMode != .off {
+                    Text(player.sleepTimerStatusText)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.58))
+                }
+            }
+
+            HStack(spacing: 7) {
+                ForEach(
+                    [
+                        SleepTimerMode.minutes15,
+                        .minutes30,
+                        .minutes60,
+                        .endOfCurrentVideo
+                    ]
+                ) { mode in
+                    Button {
+                        player.setSleepTimer(mode)
+                    } label: {
+                        Text(mode.title)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .background(
+                                player.sleepTimerMode == mode
+                                ? Color.white
+                                : Color.white.opacity(0.1)
+                            )
+                            .foregroundStyle(
+                                player.sleepTimerMode == mode
+                                ? Color.black
+                                : Color.white
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if player.sleepTimerMode != .off {
+                Button {
+                    player.clearSleepTimer()
+                } label: {
+                    Label("타이머 해제", systemImage: "xmark.circle")
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.72))
+            }
         }
     }
 

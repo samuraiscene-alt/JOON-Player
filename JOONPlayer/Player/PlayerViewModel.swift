@@ -62,6 +62,44 @@ enum PlaylistRepeatMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum SleepTimerMode: String, CaseIterable, Identifiable {
+    case off
+    case minutes15
+    case minutes30
+    case minutes60
+    case endOfCurrentVideo
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .off:
+            return "끔"
+        case .minutes15:
+            return "15분"
+        case .minutes30:
+            return "30분"
+        case .minutes60:
+            return "60분"
+        case .endOfCurrentVideo:
+            return "영상 끝"
+        }
+    }
+
+    var durationSeconds: TimeInterval? {
+        switch self {
+        case .minutes15:
+            return 15 * 60
+        case .minutes30:
+            return 30 * 60
+        case .minutes60:
+            return 60 * 60
+        case .off, .endOfCurrentVideo:
+            return nil
+        }
+    }
+}
+
 enum SubtitleVerticalPosition: String, CaseIterable, Identifiable {
     case standard
     case raised
@@ -110,6 +148,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published private(set) var abRepeatStartSeconds: Double?
     @Published private(set) var abRepeatEndSeconds: Double?
 
+    @Published private(set) var sleepTimerMode: SleepTimerMode = .off
+    @Published private(set) var sleepTimerRemainingSeconds: Int?
+
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
     @Published var subtitleDelayMilliseconds = 0
@@ -150,6 +191,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private var lastObservedPlaybackSecond: Double = 0
     private var playlistBaseItems: [PlaybackQueueItem] = []
 
+    private var sleepTimerTask: Task<Void, Never>?
+    private var sleepTimerDeadline: Date?
+
     private enum PreferenceKey {
         static let subtitleFontScale = "joonplayer.subtitle.fontScale"
         static let subtitleVerticalPosition = "joonplayer.subtitle.verticalPosition"
@@ -181,6 +225,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     deinit {
+        sleepTimerTask?.cancel()
         mediaPlayer.stop()
         releaseSubtitleScope()
         releaseSecurityScope()
@@ -436,6 +481,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         fileName = url.lastPathComponent
 
         clearABRepeat()
+        clearSleepTimer()
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -589,6 +635,38 @@ final class PlayerViewModel: NSObject, ObservableObject {
         abRepeatEndSeconds = nil
     }
 
+    func setSleepTimer(_ mode: SleepTimerMode) {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerDeadline = nil
+        sleepTimerRemainingSeconds = nil
+        sleepTimerMode = mode
+
+        guard let durationSeconds = mode.durationSeconds else {
+            return
+        }
+
+        let deadline = Date().addingTimeInterval(durationSeconds)
+        sleepTimerDeadline = deadline
+        sleepTimerRemainingSeconds = Int(durationSeconds.rounded(.up))
+
+        sleepTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled, let self else { return }
+                self.refreshSleepTimer()
+            }
+        }
+    }
+
+    func clearSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        sleepTimerDeadline = nil
+        sleepTimerRemainingSeconds = nil
+        sleepTimerMode = .off
+    }
+
     func setVideoDisplayMode(_ mode: VideoDisplayMode) {
         videoDisplayMode = mode
         applyVideoDisplayMode()
@@ -736,6 +814,30 @@ final class PlayerViewModel: NSObject, ObservableObject {
         return Self.formatTime(abRepeatEndSeconds)
     }
 
+    var sleepTimerStatusText: String {
+        switch sleepTimerMode {
+        case .off:
+            return "꺼짐"
+
+        case .endOfCurrentVideo:
+            return "현재 영상 끝나면 정지"
+
+        case .minutes15, .minutes30, .minutes60:
+            guard let sleepTimerRemainingSeconds else {
+                return sleepTimerMode.title
+            }
+
+            let minutes = sleepTimerRemainingSeconds / 60
+            let seconds = sleepTimerRemainingSeconds % 60
+
+            return String(
+                format: "%02d:%02d 후 정지",
+                minutes,
+                seconds
+            )
+        }
+    }
+
     var formattedCurrentTime: String {
         Self.formatTime(currentSeconds)
     }
@@ -873,6 +975,33 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         seek(to: pendingResumeSeconds)
+    }
+
+    private func refreshSleepTimer() {
+        guard
+            sleepTimerMode != .off,
+            sleepTimerMode != .endOfCurrentVideo,
+            let sleepTimerDeadline
+        else {
+            return
+        }
+
+        let remaining = Int(
+            ceil(sleepTimerDeadline.timeIntervalSinceNow)
+        )
+
+        if remaining <= 0 {
+            persistPlaybackProgress()
+
+            if mediaPlayer.isPlaying {
+                mediaPlayer.pause()
+            }
+
+            clearSleepTimer()
+            return
+        }
+
+        sleepTimerRemainingSeconds = remaining
     }
 
     private func enforceABRepeatIfNeeded() {
@@ -1058,6 +1187,12 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             isPlaying = false
 
             if
+                finishedNaturally,
+                sleepTimerMode == .endOfCurrentVideo
+            {
+                persistPlaybackProgress()
+                clearSleepTimer()
+            } else if
                 finishedNaturally,
                 isABRepeatActive,
                 let startSeconds = abRepeatStartSeconds

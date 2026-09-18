@@ -34,6 +34,13 @@ struct PlaybackControls: View {
                     .clipShape(Capsule())
             }
 
+            if player.sleepTimerMode != .off {
+                Image(systemName: "moon.zzz.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.82))
+                    .accessibilityLabel("취침 타이머 활성화")
+            }
+
             Text(player.formattedCurrentTime)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.78))
