@@ -27,6 +27,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                bookmarkSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 abRepeatSection
 
                 Divider()
@@ -219,6 +224,146 @@ struct QuickSettingsPanel: View {
                 horizontal: false,
                 vertical: true
             )
+        }
+    }
+
+    private var bookmarkSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "북마크",
+                    systemImage: "bookmark"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                if !player.playbackBookmarks.isEmpty {
+                    Text("\(player.playbackBookmarks.count)개")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.46))
+                }
+            }
+
+            Button {
+                player.addPlaybackBookmark()
+            } label: {
+                HStack {
+                    Image(
+                        systemName:
+                            player.canAddPlaybackBookmark
+                            ? "bookmark.badge.plus"
+                            : "bookmark.fill"
+                    )
+
+                    Text(
+                        player.canAddPlaybackBookmark
+                        ? "현재 위치 저장"
+                        : "현재 위치 저장됨"
+                    )
+
+                    Spacer()
+
+                    Text(player.formattedCurrentTime)
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.white.opacity(0.58))
+                }
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!player.canAddPlaybackBookmark)
+            .opacity(
+                player.canAddPlaybackBookmark
+                ? 1
+                : 0.55
+            )
+
+            if !player.playbackBookmarks.isEmpty {
+                VStack(spacing: 5) {
+                    ForEach(player.playbackBookmarks) { bookmark in
+                        HStack(spacing: 8) {
+                            Button {
+                                player.jumpToPlaybackBookmark(
+                                    id: bookmark.id
+                                )
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(
+                                        systemName:
+                                            player.isCurrentPlaybackBookmark(
+                                                bookmark
+                                            )
+                                            ? "play.circle.fill"
+                                            : "play.circle"
+                                    )
+
+                                    Text(bookmark.timeText)
+                                        .font(
+                                            .caption.monospacedDigit()
+                                                .weight(.semibold)
+                                        )
+
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.white)
+
+                            Button(role: .destructive) {
+                                player.removePlaybackBookmark(
+                                    id: bookmark.id
+                                )
+                            } label: {
+                                Image(systemName: "trash")
+                                    .font(.caption)
+                                    .frame(
+                                        width: 30,
+                                        height: 30
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(
+                                .white.opacity(0.58)
+                            )
+                            .accessibilityLabel("북마크 삭제")
+                        }
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(.white.opacity(0.07))
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 10,
+                                style: .continuous
+                            )
+                        )
+                    }
+                }
+
+                Button(role: .destructive) {
+                    player.removeAllPlaybackBookmarks()
+                } label: {
+                    Label(
+                        "이 영상 북마크 모두 삭제",
+                        systemImage: "trash"
+                    )
+                    .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.58))
+            } else {
+                Text(
+                    "원하는 장면에서 현재 위치를 저장하면 다음에 이 영상을 다시 열어도 그대로 남아 있습니다."
+                )
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.42))
+                .fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
         }
     }
 

@@ -101,6 +101,34 @@ struct MediaChapterOption: Identifiable, Equatable {
     }
 }
 
+struct PlaybackBookmark: Identifiable, Codable, Equatable {
+    let id: UUID
+    let seconds: Double
+    let createdAt: Date
+
+    var timeText: String {
+        let total = max(Int(seconds.rounded(.down)), 0)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                secs
+            )
+        }
+
+        return String(
+            format: "%02d:%02d",
+            minutes,
+            secs
+        )
+    }
+}
+
 struct PlaybackQueueItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
@@ -233,6 +261,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published private(set) var audioTrackOptions: [MediaTrackOption] = []
     @Published private(set) var textTrackOptions: [MediaTrackOption] = []
     @Published private(set) var chapterOptions: [MediaChapterOption] = []
+    @Published private(set) var playbackBookmarks: [PlaybackBookmark] = []
 
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
@@ -280,6 +309,12 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private enum PreferenceKey {
         static let subtitleFontScale = "joonplayer.subtitle.fontScale"
         static let subtitleVerticalPosition = "joonplayer.subtitle.verticalPosition"
+        static let playbackBookmarks = "joonplayer.playback.bookmarks.v1"
+    }
+
+    private enum BookmarkRule {
+        static let duplicateThreshold: Double = 0.75
+        static let maximumPerMedia = 50
     }
 
     override init() {
@@ -547,6 +582,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         isUsingSecurityScope = url.startAccessingSecurityScopedResource()
 
         currentResumeIdentifier = PlaybackResumeStore.identifier(for: url)
+        loadPlaybackBookmarks()
+
         pendingResumeSeconds = allowResume
             ? currentResumeIdentifier.flatMap {
                 resumeStore.position(for: $0)
@@ -602,6 +639,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         currentResumeIdentifier = nil
         pendingResumeSeconds = nil
         lastSavedResumeSecond = -1
+        playbackBookmarks = []
 
         pictureInPictureController = nil
         isPictureInPictureReady = false
@@ -665,6 +703,89 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         mediaPlayer.gotoNextFrame()
+    }
+
+    func addPlaybackBookmark() {
+        guard
+            hasMedia,
+            durationSeconds > 0,
+            currentResumeIdentifier != nil
+        else {
+            errorMessage = "북마크를 저장할 수 있는 영상이 준비되지 않았습니다."
+            return
+        }
+
+        let target = min(
+            max(currentSeconds, 0),
+            durationSeconds
+        )
+
+        guard playbackBookmarks.contains(
+            where: {
+                abs($0.seconds - target)
+                    <= BookmarkRule.duplicateThreshold
+            }
+        ) == false else {
+            return
+        }
+
+        playbackBookmarks.append(
+            PlaybackBookmark(
+                id: UUID(),
+                seconds: target,
+                createdAt: Date()
+            )
+        )
+
+        if playbackBookmarks.count
+            > BookmarkRule.maximumPerMedia
+        {
+            let oldestIDs = playbackBookmarks
+                .sorted { $0.createdAt < $1.createdAt }
+                .prefix(
+                    playbackBookmarks.count
+                    - BookmarkRule.maximumPerMedia
+                )
+                .map(\.id)
+
+            playbackBookmarks.removeAll {
+                oldestIDs.contains($0.id)
+            }
+        }
+
+        playbackBookmarks.sort {
+            $0.seconds < $1.seconds
+        }
+
+        savePlaybackBookmarks()
+    }
+
+    func jumpToPlaybackBookmark(
+        id: UUID
+    ) {
+        guard let bookmark = playbackBookmarks.first(
+            where: { $0.id == id }
+        ) else {
+            return
+        }
+
+        seek(to: bookmark.seconds)
+    }
+
+    func removePlaybackBookmark(
+        id: UUID
+    ) {
+        playbackBookmarks.removeAll {
+            $0.id == id
+        }
+        savePlaybackBookmarks()
+    }
+
+    func removeAllPlaybackBookmarks() {
+        guard !playbackBookmarks.isEmpty else { return }
+
+        playbackBookmarks = []
+        savePlaybackBookmarks()
     }
 
     func seek(to seconds: Double) {
@@ -1279,6 +1400,27 @@ final class PlayerViewModel: NSObject, ObservableObject {
             || mediaPlayer.state == .paused
     }
 
+    var canAddPlaybackBookmark: Bool {
+        guard
+            hasMedia,
+            durationSeconds > 0,
+            currentResumeIdentifier != nil
+        else {
+            return false
+        }
+
+        return playbackBookmarks.contains {
+            abs($0.seconds - currentSeconds)
+                <= BookmarkRule.duplicateThreshold
+        } == false
+    }
+
+    func isCurrentPlaybackBookmark(
+        _ bookmark: PlaybackBookmark
+    ) -> Bool {
+        abs(bookmark.seconds - currentSeconds) <= 0.75
+    }
+
     var selectedAudioTrackName: String {
         audioTrackOptions.first(where: { $0.isSelected })?.name
             ?? "자동"
@@ -1417,6 +1559,67 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     var formattedSubtitleFontScale: String {
         "\(Int((subtitleFontScale * 100).rounded()))%"
+    }
+
+    private func loadPlaybackBookmarks() {
+        guard let identifier = currentResumeIdentifier else {
+            playbackBookmarks = []
+            return
+        }
+
+        let allBookmarks = readPlaybackBookmarkStorage()
+        playbackBookmarks = allBookmarks[identifier, default: []]
+            .sorted { $0.seconds < $1.seconds }
+    }
+
+    private func savePlaybackBookmarks() {
+        guard let identifier = currentResumeIdentifier else {
+            return
+        }
+
+        var allBookmarks = readPlaybackBookmarkStorage()
+
+        if playbackBookmarks.isEmpty {
+            allBookmarks.removeValue(forKey: identifier)
+        } else {
+            allBookmarks[identifier] = playbackBookmarks
+        }
+
+        if allBookmarks.isEmpty {
+            UserDefaults.standard.removeObject(
+                forKey: PreferenceKey.playbackBookmarks
+            )
+            return
+        }
+
+        guard let data = try? JSONEncoder().encode(
+            allBookmarks
+        ) else {
+            return
+        }
+
+        UserDefaults.standard.set(
+            data,
+            forKey: PreferenceKey.playbackBookmarks
+        )
+    }
+
+    private func readPlaybackBookmarkStorage()
+        -> [String: [PlaybackBookmark]]
+    {
+        guard
+            let data = UserDefaults.standard.data(
+                forKey: PreferenceKey.playbackBookmarks
+            ),
+            let decoded = try? JSONDecoder().decode(
+                [String: [PlaybackBookmark]].self,
+                from: data
+            )
+        else {
+            return [:]
+        }
+
+        return decoded
     }
 
     private func normalizedTrackName(
