@@ -6,6 +6,7 @@ struct QuickSettingsPanel: View {
     let onChooseSubtitle: () -> Void
     let onRepairVideo: () -> Void
     let onShowMediaInfo: () -> Void
+    let onCaptureSnapshot: () -> Void
 
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
@@ -75,6 +76,22 @@ struct QuickSettingsPanel: View {
                             .foregroundStyle(.white.opacity(0.42))
                     }
                     .font(.subheadline)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                Button(action: onCaptureSnapshot) {
+                    Label(
+                        "현재 장면 스크린샷",
+                        systemImage: "camera"
+                    )
                     .frame(
                         maxWidth: .infinity,
                         alignment: .leading

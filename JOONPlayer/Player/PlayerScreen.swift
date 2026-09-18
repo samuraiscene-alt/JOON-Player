@@ -15,6 +15,9 @@ struct PlayerScreen: View {
     @State private var showTrimEditor = false
     @State private var showRepairView = false
     @State private var showMediaInfo = false
+    @State private var showSnapshotShareSheet = false
+    @State private var snapshotURL: URL?
+    @State private var isCapturingSnapshot = false
     @State private var showPlaylist = false
     @State private var isControlsLocked = false
     @State private var seekGestureFeedback: SeekGestureFeedback?
@@ -89,6 +92,22 @@ struct PlayerScreen: View {
                     .tint(.white)
                     .scaleEffect(1.15)
             }
+
+            if isCapturingSnapshot {
+                HStack(spacing: 10) {
+                    ProgressView()
+                        .tint(.white)
+
+                    Text("현재 장면 캡처 중…")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.white)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 11)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .allowsHitTesting(false)
+            }
         }
         .animation(.easeInOut(duration: 0.18), value: controlsVisible)
         .animation(.easeInOut(duration: 0.18), value: isControlsLocked)
@@ -126,6 +145,16 @@ struct PlayerScreen: View {
         .sheet(isPresented: $showMediaInfo) {
             MediaInfoView(player: player)
         }
+        .sheet(
+            isPresented: $showSnapshotShareSheet,
+            onDismiss: cleanupSnapshot
+        ) {
+            if let snapshotURL {
+                SnapshotShareSheet(
+                    items: [snapshotURL]
+                )
+            }
+        }
         .sheet(isPresented: $showPlaylist) {
             PlaybackQueueView(
                 player: player,
@@ -143,6 +172,7 @@ struct PlayerScreen: View {
             verticalAdjustmentFeedback = nil
             suppressNextSingleTap = false
 
+            cleanupSnapshot()
             endTemporaryDoubleSpeed()
             autoHideTask?.cancel()
         }
@@ -425,6 +455,10 @@ struct PlayerScreen: View {
                     onShowMediaInfo: {
                         showSettings = false
                         showMediaInfo = true
+                    },
+                    onCaptureSnapshot: {
+                        showSettings = false
+                        captureSnapshot()
                     }
                 )
                 .padding(.top, 58)
@@ -952,6 +986,7 @@ struct PlayerScreen: View {
         showSettings = false
         showPlaylist = false
         showMediaInfo = false
+        showSnapshotShareSheet = false
         seekFeedbackTask?.cancel()
         horizontalSeekFeedbackTask?.cancel()
         verticalAdjustmentFeedbackTask?.cancel()
@@ -972,6 +1007,45 @@ struct PlayerScreen: View {
         isControlsLocked = false
         controlsVisible = true
         scheduleAutoHideIfNeeded()
+    }
+
+    private func captureSnapshot() {
+        guard !isCapturingSnapshot else { return }
+
+        isCapturingSnapshot = true
+        snapshotURL = nil
+
+        Task {
+            do {
+                let url = try await player
+                    .captureCurrentFrameSnapshot()
+
+                await MainActor.run {
+                    snapshotURL = url
+                    isCapturingSnapshot = false
+                    showSnapshotShareSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    isCapturingSnapshot = false
+                    player.present(
+                        error: error.localizedDescription
+                    )
+                }
+            }
+        }
+    }
+
+    private func cleanupSnapshot() {
+        if let snapshotURL {
+            try? FileManager.default.removeItem(
+                at: snapshotURL
+            )
+        }
+
+        snapshotURL = nil
+        showSnapshotShareSheet = false
+        isCapturingSnapshot = false
     }
 
     private func formatGestureTime(
@@ -1120,4 +1194,23 @@ private enum SeekGestureFeedback: Equatable {
             return "+10초"
         }
     }
+}
+
+
+private struct SnapshotShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(
+        context: Context
+    ) -> UIActivityViewController {
+        UIActivityViewController(
+            activityItems: items,
+            applicationActivities: nil
+        )
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIActivityViewController,
+        context: Context
+    ) {}
 }

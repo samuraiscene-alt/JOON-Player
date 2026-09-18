@@ -57,6 +57,20 @@ struct MediaInfoSnapshot: Equatable {
     let textTracks: [MediaInfoTrack]
 }
 
+enum VideoSnapshotError: LocalizedError {
+    case noVideoOutput
+    case timedOut
+
+    var errorDescription: String? {
+        switch self {
+        case .noVideoOutput:
+            return "현재 장면을 캡처할 수 있는 영상 출력이 아직 준비되지 않았습니다."
+        case .timedOut:
+            return "스크린샷 파일을 만드는 데 시간이 너무 오래 걸렸습니다. 잠시 뒤 다시 시도해 주세요."
+        }
+    }
+}
+
 struct MediaChapterOption: Identifiable, Equatable {
     let id: Int
     let name: String
@@ -747,6 +761,62 @@ final class PlayerViewModel: NSObject, ObservableObject {
     func setVideoDisplayMode(_ mode: VideoDisplayMode) {
         videoDisplayMode = mode
         applyVideoDisplayMode()
+    }
+
+    func captureCurrentFrameSnapshot() async throws -> URL {
+        guard
+            hasMedia,
+            !isLoading,
+            !mediaPlayer.videoTracks.isEmpty,
+            mediaPlayer.state == .playing
+                || mediaPlayer.state == .paused
+        else {
+            throw VideoSnapshotError.noVideoOutput
+        }
+
+        let baseName = securityScopedURL?
+            .deletingPathExtension()
+            .lastPathComponent
+            ?? "JOON_Player"
+
+        let timeLabel = Self.snapshotTimeLabel(
+            currentSeconds
+        )
+
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "\(baseName)_snapshot_\(timeLabel)_\(UUID().uuidString.prefix(6))"
+            )
+            .appendingPathExtension("png")
+
+        try? FileManager.default.removeItem(at: outputURL)
+
+        mediaPlayer.saveVideoSnapshot(
+            at: outputURL.path,
+            withWidth: 0,
+            andHeight: 0
+        )
+
+        for _ in 0..<40 {
+            try await Task.sleep(for: .milliseconds(50))
+
+            if
+                FileManager.default.fileExists(
+                    atPath: outputURL.path
+                ),
+                let attributes = try? FileManager.default
+                    .attributesOfItem(
+                        atPath: outputURL.path
+                    ),
+                let fileSize = attributes[.size] as? NSNumber,
+                fileSize.int64Value > 0
+            {
+                return outputURL
+            }
+        }
+
+        try? FileManager.default.removeItem(at: outputURL)
+        throw VideoSnapshotError.timedOut
     }
 
     func mediaInfoSnapshot() -> MediaInfoSnapshot {
@@ -1580,6 +1650,34 @@ final class PlayerViewModel: NSObject, ObservableObject {
         guard abs(currentWholeSecond - lastSavedResumeSecond) >= 5 else { return }
 
         persistPlaybackProgress()
+    }
+
+    private static func snapshotTimeLabel(
+        _ seconds: Double
+    ) -> String {
+        guard seconds.isFinite, seconds >= 0 else {
+            return "00-00"
+        }
+
+        let total = Int(seconds.rounded(.down))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+
+        if hours > 0 {
+            return String(
+                format: "%02d-%02d-%02d",
+                hours,
+                minutes,
+                secs
+            )
+        }
+
+        return String(
+            format: "%02d-%02d",
+            minutes,
+            secs
+        )
     }
 
     private static func formatTime(_ seconds: Double) -> String {
