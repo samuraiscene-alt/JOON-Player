@@ -250,6 +250,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var volume: Double = 1.0
     @Published var isMuted = false
     @Published var playbackRate: Float = 1.0
+    @Published var audioDelayMilliseconds = 0
     @Published var videoDisplayMode: VideoDisplayMode = .original
 
     @Published private(set) var abRepeatStartSeconds: Double?
@@ -609,10 +610,12 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleName = nil
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
+        audioDelayMilliseconds = 0
         pendingSubtitlePositionRestartSeconds = nil
 
         mediaPlayer.media = makeMedia(url: url)
         mediaPlayer.rate = playbackRate
+        mediaPlayer.currentAudioPlaybackDelay = 0
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
 
         if let automaticSubtitle = findAutomaticSubtitle(for: url) {
@@ -670,6 +673,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleName = nil
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
+        audioDelayMilliseconds = 0
         pendingSubtitlePositionRestartSeconds = nil
     }
 
@@ -830,6 +834,33 @@ final class PlayerViewModel: NSObject, ObservableObject {
         let clamped = min(max(rate, 0.5), 2.0)
         playbackRate = clamped
         mediaPlayer.rate = clamped
+    }
+
+    func adjustAudioDelay(
+        byMilliseconds delta: Int
+    ) {
+        setAudioDelay(
+            milliseconds:
+                audioDelayMilliseconds + delta
+        )
+    }
+
+    func resetAudioDelay() {
+        setAudioDelay(milliseconds: 0)
+    }
+
+    func setAudioDelay(
+        milliseconds: Int
+    ) {
+        let clamped = min(
+            max(milliseconds, -10_000),
+            10_000
+        )
+
+        audioDelayMilliseconds = clamped
+
+        mediaPlayer.currentAudioPlaybackDelay =
+            clamped * 1_000
     }
 
     func markABRepeatStart() {
@@ -1213,6 +1244,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         track.isSelectedExclusively = true
+        mediaPlayer.currentAudioPlaybackDelay =
+            audioDelayMilliseconds * 1_000
         refreshAvailableTracks()
     }
 
@@ -1539,6 +1572,20 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
     }
 
+    var formattedAudioDelay: String {
+        let seconds =
+            Double(audioDelayMilliseconds) / 1000.0
+
+        if audioDelayMilliseconds == 0 {
+            return "0.0초"
+        }
+
+        return String(
+            format: "%+.1f초",
+            seconds
+        )
+    }
+
     var formattedCurrentTime: String {
         Self.formatTime(currentSeconds)
     }
@@ -1762,6 +1809,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.stop()
         mediaPlayer.media = makeMedia(url: videoURL)
         mediaPlayer.rate = playbackRate
+        mediaPlayer.currentAudioPlaybackDelay =
+            audioDelayMilliseconds * 1_000
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
         applyVolumeToEngine()
         applyVideoDisplayMode()

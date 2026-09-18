@@ -52,6 +52,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                audioSyncSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 chapterSection
 
                 Divider()
@@ -659,6 +664,68 @@ struct QuickSettingsPanel: View {
         .padding(.vertical, 6)
         .background(.white.opacity(0.1))
         .clipShape(Capsule())
+    }
+
+    private var audioSyncSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "오디오 싱크",
+                    systemImage: "waveform"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(player.formattedAudioDelay)
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.58))
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    player.adjustAudioDelay(
+                        byMilliseconds: -100
+                    )
+                } label: {
+                    Text("-0.1")
+                        .frame(minWidth: 48)
+                }
+
+                Button {
+                    player.resetAudioDelay()
+                } label: {
+                    Text(player.formattedAudioDelay)
+                        .font(.caption.monospacedDigit())
+                        .frame(
+                            minWidth: 76
+                        )
+                }
+
+                Button {
+                    player.adjustAudioDelay(
+                        byMilliseconds: 100
+                    )
+                } label: {
+                    Text("+0.1")
+                        .frame(minWidth: 48)
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.bordered)
+            .tint(.white.opacity(0.82))
+
+            Text(
+                "−는 소리를 앞당기고, +는 소리를 늦춥니다. 가운데 값을 누르면 0.0초로 초기화됩니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.44))
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
     }
 
     private var chapterSection: some View {
