@@ -57,6 +57,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                audioOutputSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 chapterSection
 
                 Divider()
@@ -718,6 +723,60 @@ struct QuickSettingsPanel: View {
 
             Text(
                 "−는 소리를 앞당기고, +는 소리를 늦춥니다. 가운데 값을 누르면 0.0초로 초기화됩니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.44))
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
+    }
+
+    private var audioOutputSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "오디오 출력",
+                    systemImage: "hifispeaker.2"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(player.audioOutputMode.title)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.48))
+            }
+
+            HStack(spacing: 6) {
+                ForEach(AudioOutputMode.allCases) { mode in
+                    Button {
+                        player.setAudioOutputMode(mode)
+                    } label: {
+                        Text(mode.title)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .background(
+                                player.audioOutputMode == mode
+                                ? Color.white
+                                : Color.white.opacity(0.1)
+                            )
+                            .foregroundStyle(
+                                player.audioOutputMode == mode
+                                ? Color.black
+                                : Color.white
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text(
+                "기본은 원본 출력을 유지합니다. 좌/우는 해당 채널만 듣고 싶을 때 사용할 수 있습니다."
             )
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.44))

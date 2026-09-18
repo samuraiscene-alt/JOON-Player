@@ -3,6 +3,46 @@ import Foundation
 import UIKit
 import VLCKit
 
+enum AudioOutputMode: String, CaseIterable, Identifiable {
+    case automatic
+    case stereo
+    case mono
+    case left
+    case right
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .automatic:
+            return "기본"
+        case .stereo:
+            return "스테레오"
+        case .mono:
+            return "모노"
+        case .left:
+            return "좌"
+        case .right:
+            return "우"
+        }
+    }
+
+    var vlcRawValue: UInt {
+        switch self {
+        case .automatic:
+            return 0
+        case .stereo:
+            return 1
+        case .left:
+            return 3
+        case .right:
+            return 4
+        case .mono:
+            return 7
+        }
+    }
+}
+
 enum VideoDisplayMode: String, CaseIterable, Identifiable {
     case original
     case fit
@@ -251,6 +291,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var isMuted = false
     @Published var playbackRate: Float = 1.0
     @Published var audioDelayMilliseconds = 0
+    @Published var audioOutputMode: AudioOutputMode = .automatic
     @Published var videoDisplayMode: VideoDisplayMode = .original
 
     @Published private(set) var abRepeatStartSeconds: Double?
@@ -611,11 +652,13 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
         audioDelayMilliseconds = 0
+        audioOutputMode = .automatic
         pendingSubtitlePositionRestartSeconds = nil
 
         mediaPlayer.media = makeMedia(url: url)
         mediaPlayer.rate = playbackRate
         mediaPlayer.currentAudioPlaybackDelay = 0
+        applyAudioOutputMode()
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
 
         if let automaticSubtitle = findAutomaticSubtitle(for: url) {
@@ -674,6 +717,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
         audioDelayMilliseconds = 0
+        audioOutputMode = .automatic
         pendingSubtitlePositionRestartSeconds = nil
     }
 
@@ -847,6 +891,13 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     func resetAudioDelay() {
         setAudioDelay(milliseconds: 0)
+    }
+
+    func setAudioOutputMode(
+        _ mode: AudioOutputMode
+    ) {
+        audioOutputMode = mode
+        applyAudioOutputMode()
     }
 
     func setAudioDelay(
@@ -1246,6 +1297,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         track.isSelectedExclusively = true
         mediaPlayer.currentAudioPlaybackDelay =
             audioDelayMilliseconds * 1_000
+        applyAudioOutputMode()
         refreshAvailableTracks()
     }
 
@@ -1737,6 +1789,18 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
     }
 
+    private func applyAudioOutputMode() {
+        guard let mode =
+            VLCMediaPlayer.AudioStereoMode(
+                rawValue: audioOutputMode.vlcRawValue
+            )
+        else {
+            return
+        }
+
+        mediaPlayer.audioStereoMode = mode
+    }
+
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
 
@@ -1811,6 +1875,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.rate = playbackRate
         mediaPlayer.currentAudioPlaybackDelay =
             audioDelayMilliseconds * 1_000
+        applyAudioOutputMode()
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
         applyVolumeToEngine()
         applyVideoDisplayMode()
@@ -2094,6 +2159,9 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             applyPendingResumeIfPossible()
             applyPendingSubtitlePositionRestartIfPossible()
             applyVideoDisplayMode()
+            mediaPlayer.currentAudioPlaybackDelay =
+                audioDelayMilliseconds * 1_000
+            applyAudioOutputMode()
             mediaPlayer.currentSubTitleFontScale = subtitleFontScale
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()
@@ -2102,6 +2170,9 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         case .paused:
             isLoading = false
             isPlaying = false
+            mediaPlayer.currentAudioPlaybackDelay =
+                audioDelayMilliseconds * 1_000
+            applyAudioOutputMode()
             persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()
