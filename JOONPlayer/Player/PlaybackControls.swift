@@ -4,6 +4,7 @@ struct PlaybackControls: View {
     @ObservedObject var player: PlayerViewModel
     let isLandscape: Bool
     @Binding var showVolumePopup: Bool
+    let onLockControls: () -> Void
 
     var body: some View {
         VStack(spacing: isLandscape ? 10 : 14) {
@@ -77,11 +78,12 @@ struct PlaybackControls: View {
 
             Spacer()
 
-            Image(systemName: "lock.open")
-                .font(.system(size: 19, weight: .regular))
-                .frame(width: 44, height: 44)
-                .foregroundStyle(.white.opacity(0.38))
-                .accessibilityLabel("화면 잠금은 다음 단계에서 추가됩니다")
+            Button(action: onLockControls) {
+                Image(systemName: "lock.open")
+                    .font(.system(size: 19, weight: .regular))
+                    .frame(width: 44, height: 44)
+            }
+            .accessibilityLabel("화면 잠금")
         }
         .foregroundStyle(.white)
         .buttonStyle(.plain)

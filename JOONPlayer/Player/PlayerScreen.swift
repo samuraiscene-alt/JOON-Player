@@ -9,6 +9,7 @@ struct PlayerScreen: View {
     @State private var controlsVisible = true
     @State private var showVolumePopup = false
     @State private var showSettings = false
+    @State private var isControlsLocked = false
     @State private var autoHideTask: Task<Void, Never>?
 
     var body: some View {
@@ -19,10 +20,14 @@ struct PlayerScreen: View {
                 .background(Color.black)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard !isControlsLocked else { return }
                     toggleControls()
                 }
 
-            if controlsVisible {
+            if isControlsLocked {
+                lockedOverlay
+                    .transition(.opacity)
+            } else if controlsVisible {
                 overlay
                     .transition(.opacity)
             }
@@ -34,6 +39,7 @@ struct PlayerScreen: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: controlsVisible)
+        .animation(.easeInOut(duration: 0.18), value: isControlsLocked)
         .onAppear {
             scheduleAutoHideIfNeeded()
         }
@@ -41,7 +47,9 @@ struct PlayerScreen: View {
             scheduleAutoHideIfNeeded()
         }
         .onChange(of: isLandscape) {
-            controlsVisible = true
+            if !isControlsLocked {
+                controlsVisible = true
+            }
             scheduleAutoHideIfNeeded()
         }
         .onDisappear {
@@ -65,7 +73,8 @@ struct PlayerScreen: View {
             PlaybackControls(
                 player: player,
                 isLandscape: isLandscape,
-                showVolumePopup: $showVolumePopup
+                showVolumePopup: $showVolumePopup,
+                onLockControls: lockControls
             )
             .padding(.horizontal, isLandscape ? 28 : 16)
             .padding(.bottom, isLandscape ? 14 : 10)
@@ -104,6 +113,29 @@ struct PlayerScreen: View {
                     .padding(.trailing, 18)
                     .padding(.bottom, isLandscape ? 88 : 108)
             }
+        }
+    }
+
+    private var lockedOverlay: some View {
+        VStack {
+            Spacer()
+
+            HStack {
+                Button(action: unlockControls) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("화면 잠금 해제")
+
+                Spacer()
+            }
+            .padding(.horizontal, isLandscape ? 24 : 18)
+            .padding(.bottom, isLandscape ? 18 : 16)
         }
     }
 
@@ -148,10 +180,30 @@ struct PlayerScreen: View {
         autoHideTask?.cancel()
     }
 
+    private func lockControls() {
+        isControlsLocked = true
+        controlsVisible = false
+        showVolumePopup = false
+        showSettings = false
+        autoHideTask?.cancel()
+    }
+
+    private func unlockControls() {
+        isControlsLocked = false
+        controlsVisible = true
+        scheduleAutoHideIfNeeded()
+    }
+
     private func scheduleAutoHideIfNeeded() {
         autoHideTask?.cancel()
 
-        guard isLandscape, player.isPlaying, !showSettings, !showVolumePopup else {
+        guard
+            !isControlsLocked,
+            isLandscape,
+            player.isPlaying,
+            !showSettings,
+            !showVolumePopup
+        else {
             return
         }
 
