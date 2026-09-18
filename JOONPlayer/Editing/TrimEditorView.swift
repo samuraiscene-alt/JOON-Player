@@ -7,6 +7,7 @@ struct TrimEditorView: View {
     @ObservedObject var player: PlayerViewModel
 
     @State private var trimMode: TrimExportMode = .fast
+    @State private var preciseQuality: PreciseTrimQuality = .balanced
     @State private var startSeconds: Double = 0
     @State private var endSeconds: Double = 1
     @State private var didInitializeRange = false
@@ -24,6 +25,11 @@ struct TrimEditorView: View {
                 VStack(spacing: 20) {
                     sourceSection
                     exportModeSection
+
+                    if trimMode == .precise {
+                        preciseQualitySection
+                    }
+
                     rangeSection
                     previewSection
                     exportSection
@@ -138,6 +144,29 @@ struct TrimEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.62))
             }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var preciseQualitySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("정확 자르기 품질", systemImage: "dial.medium")
+                .font(.headline)
+
+            Picker("정확 자르기 품질", selection: $preciseQuality) {
+                ForEach(PreciseTrimQuality.allCases) { quality in
+                    Text(quality.title)
+                        .tag(quality)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(preciseQuality.explanation)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.55))
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(16)
         .background(.ultraThinMaterial)
@@ -301,7 +330,7 @@ struct TrimEditorView: View {
         case .fast:
             return "빠른 자르기는 재인코딩을 피해서 속도와 원본 화질 보존을 우선합니다. 키프레임 때문에 시작점이 약간 앞뒤로 달라질 수 있습니다. 외부 SRT 자막은 포함하지 않습니다."
         case .precise:
-            return "정확 자르기는 선택 지점까지 디코딩한 뒤 영상을 다시 인코딩해 프레임 경계 기준으로 자릅니다. 처리 시간이 길고 영상이 다시 압축될 수 있습니다. 외부 SRT 자막은 포함하지 않습니다."
+            return "정확 자르기 · \(preciseQuality.title): \(preciseQuality.shortSummary) 외부 SRT 자막은 포함하지 않습니다."
         }
     }
 
@@ -396,7 +425,8 @@ struct TrimEditorView: View {
                     sourceURL: sourceURL,
                     startSeconds: startSeconds,
                     endSeconds: endSeconds,
-                    mode: trimMode
+                    mode: trimMode,
+                    quality: preciseQuality
                 )
 
                 await MainActor.run {

@@ -30,7 +30,8 @@ enum VideoTrimCoordinator {
         sourceURL: URL,
         startSeconds: Double,
         endSeconds: Double,
-        mode: TrimExportMode
+        mode: TrimExportMode,
+        quality: PreciseTrimQuality = .balanced
     ) async throws -> URL {
         switch mode {
         case .fast:
@@ -44,7 +45,8 @@ enum VideoTrimCoordinator {
             return try await PreciseVideoTrimService.export(
                 sourceURL: sourceURL,
                 startSeconds: startSeconds,
-                endSeconds: endSeconds
+                endSeconds: endSeconds,
+                quality: quality
             )
         }
     }

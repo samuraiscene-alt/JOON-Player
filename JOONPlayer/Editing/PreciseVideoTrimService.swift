@@ -1,6 +1,80 @@
 import AVFoundation
 import Foundation
 
+enum PreciseTrimQuality: String, CaseIterable, Identifiable {
+    case fast
+    case balanced
+    case high
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fast:
+            return "빠름"
+        case .balanced:
+            return "균형"
+        case .high:
+            return "고화질"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .fast:
+            return "재인코딩 시간을 줄이고 파일 크기를 작게 만드는 쪽을 우선합니다."
+        case .balanced:
+            return "처리 시간, 화질, 파일 크기의 균형을 맞춥니다. 기본값입니다."
+        case .high:
+            return "처리 시간과 파일 크기보다 영상 품질 보존을 우선합니다."
+        }
+    }
+
+    var shortSummary: String {
+        switch self {
+        case .fast:
+            return "처리 속도와 작은 파일 크기를 우선합니다."
+        case .balanced:
+            return "속도·화질·파일 크기의 균형을 맞춥니다."
+        case .high:
+            return "처리 시간보다 화질 보존을 우선합니다."
+        }
+    }
+
+    var avFoundationPresetName: String {
+        switch self {
+        case .fast:
+            return AVAssetExportPresetLowQuality
+        case .balanced:
+            return AVAssetExportPresetMediumQuality
+        case .high:
+            return AVAssetExportPresetHighestQuality
+        }
+    }
+
+    var ffmpegVideoQuality: String {
+        switch self {
+        case .fast:
+            return "6"
+        case .balanced:
+            return "4"
+        case .high:
+            return "2"
+        }
+    }
+
+    var ffmpegAudioBitrate: String {
+        switch self {
+        case .fast:
+            return "128k"
+        case .balanced:
+            return "160k"
+        case .high:
+            return "192k"
+        }
+    }
+}
+
 enum PreciseVideoTrimService {
     enum PreciseTrimError: LocalizedError {
         case engineNotLinked
@@ -48,7 +122,8 @@ enum PreciseVideoTrimService {
     static func export(
         sourceURL: URL,
         startSeconds: Double,
-        endSeconds: Double
+        endSeconds: Double,
+        quality: PreciseTrimQuality = .balanced
     ) async throws -> URL {
         guard endSeconds - startSeconds >= 0.5 else {
             throw PreciseTrimError.invalidRange
@@ -59,7 +134,8 @@ enum PreciseVideoTrimService {
                 return try await exportWithAVFoundation(
                     sourceURL: sourceURL,
                     startSeconds: startSeconds,
-                    endSeconds: endSeconds
+                    endSeconds: endSeconds,
+                    quality: quality
                 )
             } catch {
                 guard FFmpegKitNextRuntime.isAvailable else {
@@ -75,7 +151,8 @@ enum PreciseVideoTrimService {
         return try await exportWithFFmpeg(
             sourceURL: sourceURL,
             startSeconds: startSeconds,
-            endSeconds: endSeconds
+            endSeconds: endSeconds,
+            quality: quality
         )
     }
 
@@ -91,7 +168,8 @@ enum PreciseVideoTrimService {
     private static func exportWithAVFoundation(
         sourceURL: URL,
         startSeconds: Double,
-        endSeconds: Double
+        endSeconds: Double,
+        quality: PreciseTrimQuality
     ) async throws -> URL {
         let asset = AVURLAsset(url: sourceURL)
 
@@ -117,7 +195,7 @@ enum PreciseVideoTrimService {
 
         guard let exporter = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetHighestQuality
+            presetName: quality.avFoundationPresetName
         ) else {
             throw PreciseTrimError.cannotCreateExporter
         }
@@ -187,7 +265,8 @@ enum PreciseVideoTrimService {
     private static func exportWithFFmpeg(
         sourceURL: URL,
         startSeconds: Double,
-        endSeconds: Double
+        endSeconds: Double,
+        quality: PreciseTrimQuality
     ) async throws -> URL {
         let duration = endSeconds - startSeconds
 
@@ -214,9 +293,9 @@ enum PreciseVideoTrimService {
             "-map", "0:a:0?",
             "-map_metadata", "0",
             "-c:v", "mpeg4",
-            "-q:v", "2",
+            "-q:v", quality.ffmpegVideoQuality,
             "-c:a", "aac",
-            "-b:a", "192k",
+            "-b:a", quality.ffmpegAudioBitrate,
             "-movflags", "+faststart",
             "-avoid_negative_ts", "make_zero",
             outputURL.path
