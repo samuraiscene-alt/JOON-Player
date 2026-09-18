@@ -60,12 +60,22 @@ enum FFmpegKitNextRuntime {
                         return
                     }
 
-                    let details =
-                        session?.getFailStackTrace()
-                        ?? session?.getOutput()
+                    let output = session?.getOutput()
+                    let failStackTrace = session?.getFailStackTrace()
+
+                    let details = [output, failStackTrace]
+                        .compactMap { value -> String? in
+                            guard let value, !value.isEmpty else {
+                                return nil
+                            }
+                            return value
+                        }
+                        .joined(separator: "\n")
 
                     continuation.resume(
-                        throwing: ExecutionError.failed(details)
+                        throwing: ExecutionError.failed(
+                            details.isEmpty ? nil : details
+                        )
                     )
                 },
                 withLogCallback: nil,

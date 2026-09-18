@@ -9,6 +9,9 @@ struct VideoRepairView: View {
     @State private var repairedURL: URL?
     @State private var showShareSheet = false
     @State private var errorMessage: String?
+    @State private var failureSummary: FFmpegFailureSummary?
+    @State private var showTechnicalDetails = false
+    @State private var didCopyTechnicalLog = false
 
     var body: some View {
         NavigationStack {
@@ -17,6 +20,11 @@ struct VideoRepairView: View {
                     sourceSection
                     explanationSection
                     engineSection
+
+                    if let failureSummary {
+                        failureSection(failureSummary)
+                    }
+
                     repairButton
                 }
                 .padding(20)
@@ -117,6 +125,69 @@ struct VideoRepairView: View {
         .foregroundStyle(.white.opacity(0.82))
     }
 
+    private func failureSection(
+        _ report: FFmpegFailureSummary
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label(report.title, systemImage: "exclamationmark.triangle")
+                .font(.headline)
+
+            Text(report.message)
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.82))
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("다음에 해볼 것")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.58))
+
+                Text(report.suggestion)
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            DisclosureGroup(
+                "기술 로그 보기",
+                isExpanded: $showTechnicalDetails
+            ) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(report.technicalDetails)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.white.opacity(0.6))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        UIPasteboard.general.string =
+                            report.technicalDetails
+                        didCopyTechnicalLog = true
+                    } label: {
+                        Label(
+                            didCopyTechnicalLog
+                            ? "복사됨"
+                            : "기술 로그 복사",
+                            systemImage: didCopyTechnicalLog
+                            ? "checkmark"
+                            : "doc.on.doc"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(.top, 8)
+            }
+            .font(.subheadline)
+
+            Text("이 분류는 FFmpeg 로그 패턴을 바탕으로 한 안내이며 파일 손상의 확정 진단은 아닙니다.")
+                .font(.caption2)
+                .foregroundStyle(.white.opacity(0.4))
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
     private var repairButton: some View {
         Button {
             repairVideo()
@@ -155,6 +226,9 @@ struct VideoRepairView: View {
             player.togglePlayback()
         }
 
+        failureSummary = nil
+        showTechnicalDetails = false
+        didCopyTechnicalLog = false
         isRepairing = true
 
         Task {
@@ -167,6 +241,16 @@ struct VideoRepairView: View {
                     repairedURL = url
                     isRepairing = false
                     showShareSheet = true
+                }
+            } catch let repairError as VideoRepairService.RepairError {
+                await MainActor.run {
+                    isRepairing = false
+
+                    if let report = repairError.failureSummary {
+                        failureSummary = report
+                    } else {
+                        errorMessage = repairError.localizedDescription
+                    }
                 }
             } catch {
                 await MainActor.run {

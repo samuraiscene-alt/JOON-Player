@@ -6,7 +6,7 @@ enum VideoRepairService {
         case missingSource
         case cancelled
         case emptyOutput
-        case failed(String?)
+        case failed(FFmpegFailureSummary)
 
         var errorDescription: String? {
             switch self {
@@ -18,12 +18,16 @@ enum VideoRepairService {
                 return "영상 복구가 취소되었습니다."
             case .emptyOutput:
                 return "복구 작업은 끝났지만 재생 가능한 결과 파일을 만들지 못했습니다."
-            case .failed(let message):
-                if let message, !message.isEmpty {
-                    return "영상 복구에 실패했습니다.\n\(message)"
-                }
-                return "영상 복구에 실패했습니다."
+            case .failed(let report):
+                return report.message
             }
+        }
+
+        var failureSummary: FFmpegFailureSummary? {
+            guard case .failed(let report) = self else {
+                return nil
+            }
+            return report
         }
     }
 
@@ -64,11 +68,17 @@ enum VideoRepairService {
             case .cancelled:
                 throw RepairError.cancelled
             case .failed(let message):
-                throw RepairError.failed(message)
+                throw RepairError.failed(
+                    FFmpegFailureSummary.analyze(message)
+                )
             }
         } catch {
             try? FileManager.default.removeItem(at: outputURL)
-            throw RepairError.failed(error.localizedDescription)
+            throw RepairError.failed(
+                FFmpegFailureSummary.analyze(
+                    error.localizedDescription
+                )
+            )
         }
 
         guard
