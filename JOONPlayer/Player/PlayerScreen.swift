@@ -15,6 +15,8 @@ struct PlayerScreen: View {
     @State private var showRepairView = false
     @State private var showPlaylist = false
     @State private var isControlsLocked = false
+    @State private var seekGestureFeedback: SeekGestureFeedback?
+    @State private var seekFeedbackTask: Task<Void, Never>?
     @State private var autoHideTask: Task<Void, Never>?
 
     var body: some View {
@@ -23,11 +25,14 @@ struct PlayerScreen: View {
 
             VLCVideoView(player: player)
                 .background(Color.black)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard !isControlsLocked else { return }
-                    toggleControls()
-                }
+
+            videoGestureLayer
+
+            if let seekGestureFeedback {
+                seekFeedbackOverlay(seekGestureFeedback)
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale))
+            }
 
             if isControlsLocked {
                 lockedOverlay
@@ -45,6 +50,7 @@ struct PlayerScreen: View {
         }
         .animation(.easeInOut(duration: 0.18), value: controlsVisible)
         .animation(.easeInOut(duration: 0.18), value: isControlsLocked)
+        .animation(.easeOut(duration: 0.16), value: seekGestureFeedback)
         .onAppear {
             scheduleAutoHideIfNeeded()
         }
@@ -70,7 +76,62 @@ struct PlayerScreen: View {
             )
         }
         .onDisappear {
+            seekFeedbackTask?.cancel()
             autoHideTask?.cancel()
+        }
+    }
+
+    private var videoGestureLayer: some View {
+        HStack(spacing: 0) {
+            gestureZone(direction: .backward)
+            gestureZone(direction: .forward)
+        }
+        .ignoresSafeArea()
+    }
+
+    private func gestureZone(
+        direction: SeekGestureFeedback
+    ) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .gesture(
+                TapGesture(count: 2)
+                    .onEnded {
+                        handleDoubleTap(direction)
+                    }
+                    .exclusively(
+                        before: TapGesture(count: 1)
+                            .onEnded {
+                                handleSingleTap()
+                            }
+                    )
+            )
+    }
+
+    private func seekFeedbackOverlay(
+        _ feedback: SeekGestureFeedback
+    ) -> some View {
+        HStack {
+            if feedback == .forward {
+                Spacer()
+            }
+
+            VStack(spacing: 6) {
+                Image(systemName: feedback.systemImage)
+                    .font(.system(size: 30, weight: .semibold))
+
+                Text(feedback.label)
+                    .font(.caption.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .frame(width: 92, height: 92)
+            .background(.ultraThinMaterial)
+            .clipShape(Circle())
+            .padding(.horizontal, isLandscape ? 70 : 34)
+
+            if feedback == .backward {
+                Spacer()
+            }
         }
     }
 
@@ -232,6 +293,44 @@ struct PlayerScreen: View {
         }
     }
 
+    private func handleSingleTap() {
+        guard !isControlsLocked else { return }
+        toggleControls()
+    }
+
+    private func handleDoubleTap(
+        _ direction: SeekGestureFeedback
+    ) {
+        guard !isControlsLocked else { return }
+
+        switch direction {
+        case .backward:
+            player.seek(by: -10)
+
+        case .forward:
+            player.seek(by: 10)
+        }
+
+        showSeekFeedback(direction)
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func showSeekFeedback(
+        _ feedback: SeekGestureFeedback
+    ) {
+        seekFeedbackTask?.cancel()
+        seekGestureFeedback = feedback
+
+        seekFeedbackTask = Task {
+            try? await Task.sleep(for: .milliseconds(650))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                seekGestureFeedback = nil
+            }
+        }
+    }
+
     private func toggleControls() {
         if controlsVisible {
             controlsVisible = false
@@ -284,6 +383,30 @@ struct PlayerScreen: View {
             await MainActor.run {
                 controlsVisible = false
             }
+        }
+    }
+}
+
+
+private enum SeekGestureFeedback: Equatable {
+    case backward
+    case forward
+
+    var systemImage: String {
+        switch self {
+        case .backward:
+            return "gobackward.10"
+        case .forward:
+            return "goforward.10"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .backward:
+            return "-10초"
+        case .forward:
+            return "+10초"
         }
     }
 }
