@@ -22,6 +22,18 @@ enum VideoDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
+struct PlaybackQueueItem: Identifiable, Equatable {
+    let id: UUID
+    let url: URL
+    let fileName: String
+
+    init(url: URL) {
+        id = UUID()
+        self.url = url
+        fileName = url.lastPathComponent
+    }
+}
+
 enum SubtitleVerticalPosition: String, CaseIterable, Identifiable {
     case standard
     case raised
@@ -76,6 +88,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var isPictureInPictureReady = false
     @Published var isPictureInPictureActive = false
 
+    @Published private(set) var playlistItems: [PlaybackQueueItem] = []
+    @Published private(set) var playlistIndex: Int = 0
+
     let mediaPlayer = VLCMediaPlayer()
 
     private var securityScopedURL: URL?
@@ -97,6 +112,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private var pendingSubtitlePositionRestartSeconds: Double?
     private var shouldResumeAfterSubtitlePositionRestart = true
+
+    private var suppressAutomaticAdvance = true
+    private var lastObservedPlaybackSecond: Double = 0
 
     private enum PreferenceKey {
         static let subtitleFontScale = "joonplayer.subtitle.fontScale"
@@ -177,8 +195,58 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func load(url: URL) {
+        playlistItems = [PlaybackQueueItem(url: url)]
+        playlistIndex = 0
+        loadMedia(url: url)
+    }
+
+    func loadPlaylist(urls: [URL]) {
+        var seenPaths = Set<String>()
+        let uniqueURLs = urls.filter { url in
+            let path = url.standardizedFileURL.path.lowercased()
+            return seenPaths.insert(path).inserted
+        }
+
+        guard let firstURL = uniqueURLs.first else { return }
+
+        playlistItems = uniqueURLs.map(PlaybackQueueItem.init(url:))
+        playlistIndex = 0
+        loadMedia(url: firstURL)
+    }
+
+    func playNextPlaylistItem() {
+        guard canPlayNextPlaylistItem else { return }
+
+        playlistIndex += 1
+        loadMedia(url: playlistItems[playlistIndex].url)
+    }
+
+    func playPreviousPlaylistItem() {
+        guard canPlayPreviousPlaylistItem else { return }
+
+        playlistIndex -= 1
+        loadMedia(url: playlistItems[playlistIndex].url)
+    }
+
+    func playPlaylistItem(id: UUID) {
+        guard let index = playlistItems.firstIndex(
+            where: { $0.id == id }
+        ) else {
+            return
+        }
+
+        guard index != playlistIndex else { return }
+
+        playlistIndex = index
+        loadMedia(url: playlistItems[index].url)
+    }
+
+    private func loadMedia(url: URL) {
         persistPlaybackProgress()
+
+        suppressAutomaticAdvance = true
         mediaPlayer.stop()
+
         releaseSubtitleScope()
         releaseSecurityScope()
 
@@ -190,6 +258,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
             resumeStore.position(for: $0)
         }
         lastSavedResumeSecond = -1
+        lastObservedPlaybackSecond = 0
 
         hasMedia = true
         isLoading = true
@@ -236,6 +305,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
         pictureInPictureController = nil
         isPictureInPictureReady = false
         isPictureInPictureActive = false
+
+        suppressAutomaticAdvance = true
+        lastObservedPlaybackSecond = 0
+        playlistItems = []
+        playlistIndex = 0
 
         hasMedia = false
         isPlaying = false
@@ -393,6 +467,31 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     var currentMediaURL: URL? {
         securityScopedURL
+    }
+
+    var playlistCount: Int {
+        playlistItems.count
+    }
+
+    var currentPlaylistItemID: UUID? {
+        guard playlistItems.indices.contains(playlistIndex) else {
+            return nil
+        }
+
+        return playlistItems[playlistIndex].id
+    }
+
+    var playlistPositionText: String {
+        guard playlistCount > 0 else { return "" }
+        return "\(playlistIndex + 1) / \(playlistCount)"
+    }
+
+    var canPlayPreviousPlaylistItem: Bool {
+        playlistIndex > 0
+    }
+
+    var canPlayNextPlaylistItem: Bool {
+        playlistIndex + 1 < playlistItems.count
     }
 
     var formattedCurrentTime: String {
@@ -671,6 +770,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         case .playing:
             isLoading = false
             isPlaying = true
+            suppressAutomaticAdvance = false
             refreshDuration()
             applyPendingResumeIfPossible()
             applyPendingSubtitlePositionRestartIfPossible()
@@ -684,9 +784,24 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
 
-        case .stopping, .stopped:
+        case .stopping:
             isLoading = false
             isPlaying = false
+
+        case .stopped:
+            let finishedNaturally =
+                !suppressAutomaticAdvance
+                && hasMedia
+                && durationSeconds > 0
+                && lastObservedPlaybackSecond
+                    >= max(durationSeconds - 1.5, 0)
+
+            isLoading = false
+            isPlaying = false
+
+            if finishedNaturally, canPlayNextPlaylistItem {
+                playNextPlaylistItem()
+            }
 
         case .error:
             isLoading = false
@@ -703,6 +818,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
     func mediaPlayerTimeChanged(_ aNotification: Notification) {
         refreshTime()
         refreshDuration()
+        lastObservedPlaybackSecond = currentSeconds
         applyPendingResumeIfPossible()
         saveResumeProgressIfNeeded()
     }

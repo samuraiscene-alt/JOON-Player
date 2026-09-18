@@ -12,6 +12,7 @@ struct PlayerScreen: View {
     @State private var showSettings = false
     @State private var showTrimEditor = false
     @State private var showRepairView = false
+    @State private var showPlaylist = false
     @State private var isControlsLocked = false
     @State private var autoHideTask: Task<Void, Never>?
 
@@ -60,6 +61,9 @@ struct PlayerScreen: View {
         }
         .sheet(isPresented: $showRepairView) {
             VideoRepairView(player: player)
+        }
+        .sheet(isPresented: $showPlaylist) {
+            PlaybackQueueView(player: player)
         }
         .onDisappear {
             autoHideTask?.cancel()
@@ -175,6 +179,23 @@ struct PlayerScreen: View {
 
             Spacer()
 
+            if player.playlistCount > 1 {
+                Button {
+                    showVolumePopup = false
+                    showSettings = false
+                    keepControlsVisible()
+                    showPlaylist = true
+                } label: {
+                    Image(systemName: "list.bullet")
+                        .font(.system(size: 18, weight: .medium))
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .accessibilityLabel("재생 목록")
+            }
+
             Button {
                 showVolumePopup = false
                 showSettings = false
@@ -229,6 +250,7 @@ struct PlayerScreen: View {
         controlsVisible = false
         showVolumePopup = false
         showSettings = false
+        showPlaylist = false
         autoHideTask?.cancel()
     }
 

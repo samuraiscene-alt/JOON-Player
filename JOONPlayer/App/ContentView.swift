@@ -55,14 +55,21 @@ struct ContentView: View {
         .fileImporter(
             isPresented: $isVideoPickerPresented,
             allowedContentTypes: SupportedVideoTypes.all,
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
             switch result {
             case .success(let urls):
-                guard let url = urls.first else { return }
+                guard !urls.isEmpty else { return }
 
-                try? recentStore.remember(url: url)
-                player.load(url: url)
+                for url in urls.reversed() {
+                    try? recentStore.remember(url: url)
+                }
+
+                if urls.count == 1, let url = urls.first {
+                    player.load(url: url)
+                } else {
+                    player.loadPlaylist(urls: urls)
+                }
 
             case .failure(let error):
                 player.present(
@@ -157,7 +164,7 @@ private struct EmptyPlayerView: View {
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
 
-            Text("파일 앱의 동영상을 열거나 최근 파일에서 바로 이어서 재생합니다.")
+            Text("파일 앱에서 한 개 또는 여러 영상을 선택하거나 최근 파일에서 바로 이어서 재생합니다.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.64))
                 .multilineTextAlignment(.center)

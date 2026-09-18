@@ -9,6 +9,11 @@ struct PlaybackControls: View {
     var body: some View {
         VStack(spacing: isLandscape ? 10 : 14) {
             progressRow
+
+            if player.playlistCount > 1 {
+                playlistRow
+            }
+
             transportRow
         }
         .padding(.horizontal, isLandscape ? 18 : 14)
@@ -38,6 +43,40 @@ struct PlaybackControls: View {
                 .foregroundStyle(.white.opacity(0.78))
                 .frame(width: 46, alignment: .trailing)
         }
+    }
+
+    private var playlistRow: some View {
+        HStack(spacing: 14) {
+            Button {
+                player.playPreviousPlaylistItem()
+            } label: {
+                Image(systemName: "backward.end.fill")
+                    .frame(width: 36, height: 32)
+            }
+            .disabled(!player.canPlayPreviousPlaylistItem)
+            .opacity(player.canPlayPreviousPlaylistItem ? 1 : 0.3)
+            .accessibilityLabel("이전 영상")
+
+            Spacer()
+
+            Text(player.playlistPositionText)
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.white.opacity(0.72))
+
+            Spacer()
+
+            Button {
+                player.playNextPlaylistItem()
+            } label: {
+                Image(systemName: "forward.end.fill")
+                    .frame(width: 36, height: 32)
+            }
+            .disabled(!player.canPlayNextPlaylistItem)
+            .opacity(player.canPlayNextPlaylistItem ? 1 : 0.3)
+            .accessibilityLabel("다음 영상")
+        }
+        .foregroundStyle(.white)
+        .buttonStyle(.plain)
     }
 
     private var transportRow: some View {
