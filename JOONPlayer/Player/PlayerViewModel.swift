@@ -107,6 +107,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var playbackRate: Float = 1.0
     @Published var videoDisplayMode: VideoDisplayMode = .original
 
+    @Published private(set) var abRepeatStartSeconds: Double?
+    @Published private(set) var abRepeatEndSeconds: Double?
+
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
     @Published var subtitleDelayMilliseconds = 0
@@ -432,6 +435,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         errorMessage = nil
         fileName = url.lastPathComponent
 
+        clearABRepeat()
+
         subtitleName = nil
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
@@ -484,6 +489,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         currentSeconds = 0
         durationSeconds = 0
         fileName = ""
+
+        clearABRepeat()
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -547,6 +554,39 @@ final class PlayerViewModel: NSObject, ObservableObject {
         let clamped = min(max(rate, 0.5), 2.0)
         playbackRate = clamped
         mediaPlayer.rate = clamped
+    }
+
+    func markABRepeatStart() {
+        guard hasMedia, durationSeconds > 0 else { return }
+
+        let latestStart = max(durationSeconds - 0.5, 0)
+        abRepeatStartSeconds = min(
+            max(currentSeconds, 0),
+            latestStart
+        )
+        abRepeatEndSeconds = nil
+    }
+
+    func markABRepeatEnd() {
+        guard
+            let startSeconds = abRepeatStartSeconds,
+            durationSeconds > 0
+        else {
+            return
+        }
+
+        let minimumEnd = startSeconds + 0.5
+        guard currentSeconds >= minimumEnd else { return }
+
+        abRepeatEndSeconds = min(
+            currentSeconds,
+            durationSeconds
+        )
+    }
+
+    func clearABRepeat() {
+        abRepeatStartSeconds = nil
+        abRepeatEndSeconds = nil
     }
 
     func setVideoDisplayMode(_ mode: VideoDisplayMode) {
@@ -665,6 +705,35 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         return playlistIndex + 1 < playlistItems.count
             || playlistRepeatMode == .all
+    }
+
+    var isABRepeatActive: Bool {
+        guard
+            let startSeconds = abRepeatStartSeconds,
+            let endSeconds = abRepeatEndSeconds
+        else {
+            return false
+        }
+
+        return endSeconds > startSeconds
+    }
+
+    var canSetABRepeatEnd: Bool {
+        guard let startSeconds = abRepeatStartSeconds else {
+            return false
+        }
+
+        return currentSeconds >= startSeconds + 0.5
+    }
+
+    var formattedABRepeatStart: String {
+        guard let abRepeatStartSeconds else { return "--:--" }
+        return Self.formatTime(abRepeatStartSeconds)
+    }
+
+    var formattedABRepeatEnd: String {
+        guard let abRepeatEndSeconds else { return "--:--" }
+        return Self.formatTime(abRepeatEndSeconds)
     }
 
     var formattedCurrentTime: String {
@@ -804,6 +873,22 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         seek(to: pendingResumeSeconds)
+    }
+
+    private func enforceABRepeatIfNeeded() {
+        guard
+            isABRepeatActive,
+            let startSeconds = abRepeatStartSeconds,
+            let endSeconds = abRepeatEndSeconds
+        else {
+            return
+        }
+
+        guard currentSeconds >= endSeconds - 0.05 else {
+            return
+        }
+
+        seek(to: startSeconds)
     }
 
     private func saveResumeProgressIfNeeded() {
@@ -972,7 +1057,14 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             isLoading = false
             isPlaying = false
 
-            if finishedNaturally {
+            if
+                finishedNaturally,
+                isABRepeatActive,
+                let startSeconds = abRepeatStartSeconds
+            {
+                seek(to: startSeconds)
+                mediaPlayer.play()
+            } else if finishedNaturally {
                 switch playlistRepeatMode {
                 case .one:
                     if playlistItems.indices.contains(playlistIndex) {
@@ -1006,6 +1098,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         refreshDuration()
         lastObservedPlaybackSecond = currentSeconds
         applyPendingResumeIfPossible()
+        enforceABRepeatIfNeeded()
         saveResumeProgressIfNeeded()
     }
 

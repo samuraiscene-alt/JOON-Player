@@ -20,6 +20,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                abRepeatSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 videoDisplaySection
 
                 Divider()
@@ -84,6 +89,84 @@ struct QuickSettingsPanel: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private var abRepeatSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label("A-B 반복", systemImage: "repeat")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                if player.isABRepeatActive {
+                    Text("반복 중")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(.white.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+
+            HStack(spacing: 8) {
+                Button {
+                    player.markABRepeatStart()
+                } label: {
+                    VStack(spacing: 2) {
+                        Text("A 설정")
+                            .font(.caption.weight(.semibold))
+
+                        Text(player.formattedABRepeatStart)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.58))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+
+                Button {
+                    player.markABRepeatEnd()
+                } label: {
+                    VStack(spacing: 2) {
+                        Text("B 설정")
+                            .font(.caption.weight(.semibold))
+
+                        Text(player.formattedABRepeatEnd)
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.white.opacity(0.58))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .disabled(!player.canSetABRepeatEnd)
+                .opacity(player.canSetABRepeatEnd ? 1 : 0.4)
+
+                Button {
+                    player.clearABRepeat()
+                } label: {
+                    Image(systemName: "xmark")
+                        .frame(width: 34, height: 34)
+                }
+                .disabled(player.abRepeatStartSeconds == nil)
+                .opacity(
+                    player.abRepeatStartSeconds == nil
+                    ? 0.4
+                    : 1
+                )
+                .accessibilityLabel("A-B 반복 해제")
+            }
+            .buttonStyle(.bordered)
+            .tint(.white.opacity(0.82))
+
+            Text(
+                player.isABRepeatActive
+                ? "B 지점에 도달하면 A 지점으로 돌아갑니다."
+                : "A를 먼저 정한 뒤 원하는 위치에서 B를 설정합니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.45))
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 

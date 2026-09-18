@@ -24,6 +24,16 @@ struct PlaybackControls: View {
 
     private var progressRow: some View {
         HStack(spacing: 10) {
+            if player.isABRepeatActive {
+                Text("A-B")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.white.opacity(0.16))
+                    .clipShape(Capsule())
+            }
+
             Text(player.formattedCurrentTime)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.white.opacity(0.78))
