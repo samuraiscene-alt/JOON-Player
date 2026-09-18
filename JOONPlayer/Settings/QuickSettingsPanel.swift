@@ -18,6 +18,11 @@ struct QuickSettingsPanel: View {
             Divider()
                 .overlay(.white.opacity(0.12))
 
+            videoDisplaySection
+
+            Divider()
+                .overlay(.white.opacity(0.12))
+
             subtitleSection
 
             Divider()
@@ -30,7 +35,6 @@ struct QuickSettingsPanel: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white)
 
-            disabledRow(title: "화면비율", icon: "aspectratio")
             disabledRow(title: "PiP", icon: "pip")
         }
         .padding(16)
@@ -61,6 +65,39 @@ struct QuickSettingsPanel: View {
                             )
                             .foregroundStyle(
                                 player.playbackRate == rate
+                                ? Color.black
+                                : Color.white
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var videoDisplaySection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("화면비율", systemImage: "aspectratio")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+            HStack(spacing: 7) {
+                ForEach(VideoDisplayMode.allCases) { mode in
+                    Button {
+                        player.setVideoDisplayMode(mode)
+                    } label: {
+                        Text(mode.title)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(
+                                player.videoDisplayMode == mode
+                                ? Color.white
+                                : Color.white.opacity(0.1)
+                            )
+                            .foregroundStyle(
+                                player.videoDisplayMode == mode
                                 ? Color.black
                                 : Color.white
                             )

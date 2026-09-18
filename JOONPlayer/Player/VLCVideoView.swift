@@ -11,6 +11,7 @@ struct VLCVideoView: UIViewRepresentable {
 
         DispatchQueue.main.async {
             player.attach(to: view)
+            player.updateDrawableSize(view.bounds.size)
         }
 
         return view
@@ -18,5 +19,6 @@ struct VLCVideoView: UIViewRepresentable {
 
     func updateUIView(_ uiView: UIView, context: Context) {
         player.attach(to: uiView)
+        player.updateDrawableSize(uiView.bounds.size)
     }
 }

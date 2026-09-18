@@ -2,6 +2,25 @@ import Foundation
 import MobileVLCKit
 import UIKit
 
+enum VideoDisplayMode: String, CaseIterable, Identifiable {
+    case original
+    case fit
+    case fill
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .original:
+            return "원본"
+        case .fit:
+            return "화면 맞춤"
+        case .fill:
+            return "화면 채우기"
+        }
+    }
+}
+
 @MainActor
 final class PlayerViewModel: NSObject, ObservableObject {
     @Published var hasMedia = false
@@ -15,6 +34,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var volume: Double = 1.0
     @Published var isMuted = false
     @Published var playbackRate: Float = 1.0
+    @Published var videoDisplayMode: VideoDisplayMode = .original
 
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
@@ -25,6 +45,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private var securityScopedURL: URL?
     private var isUsingSecurityScope = false
     private var lastNonZeroVolume: Double = 1.0
+    private var drawableSize: CGSize = .zero
 
     private var subtitleURL: URL?
     private var isUsingSubtitleScope = false
@@ -46,6 +67,20 @@ final class PlayerViewModel: NSObject, ObservableObject {
         if mediaPlayer.drawable as? UIView !== view {
             mediaPlayer.drawable = view
         }
+
+        updateDrawableSize(view.bounds.size)
+    }
+
+    func updateDrawableSize(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+
+        let widthChanged = abs(drawableSize.width - size.width) > 0.5
+        let heightChanged = abs(drawableSize.height - size.height) > 0.5
+
+        guard widthChanged || heightChanged else { return }
+
+        drawableSize = size
+        applyVideoDisplayMode()
     }
 
     func load(url: URL) {
@@ -77,6 +112,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         }
 
         applyVolumeToEngine()
+        applyVideoDisplayMode()
         mediaPlayer.play()
     }
 
@@ -138,6 +174,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.rate = clamped
     }
 
+    func setVideoDisplayMode(_ mode: VideoDisplayMode) {
+        videoDisplayMode = mode
+        applyVideoDisplayMode()
+    }
+
     func loadSubtitle(url: URL) {
         guard hasMedia else {
             errorMessage = "동영상을 먼저 연 뒤 자막을 선택해 주세요."
@@ -188,6 +229,29 @@ final class PlayerViewModel: NSObject, ObservableObject {
         let effectiveVolume = isMuted ? 0 : volume
         mediaPlayer.audio.isMuted = isMuted
         mediaPlayer.audio.volume = Int32((effectiveVolume * 100).rounded())
+    }
+
+    private func applyVideoDisplayMode() {
+        mediaPlayer.scaleFactor = 0
+
+        switch videoDisplayMode {
+        case .original:
+            mediaPlayer.videoAspectRatio = nil
+            mediaPlayer.videoFitMode = .smaller
+
+        case .fit:
+            guard drawableSize.width > 0, drawableSize.height > 0 else { return }
+
+            let width = max(Int(drawableSize.width.rounded()), 1)
+            let height = max(Int(drawableSize.height.rounded()), 1)
+
+            mediaPlayer.videoAspectRatio = "\(width):\(height)"
+            mediaPlayer.videoFitMode = .smaller
+
+        case .fill:
+            mediaPlayer.videoAspectRatio = nil
+            mediaPlayer.videoFitMode = .larger
+        }
     }
 
     private static func formatTime(_ seconds: Double) -> String {
@@ -317,6 +381,7 @@ extension PlayerViewModel: VLCMediaPlayerDelegate {
                 isLoading = false
                 isPlaying = true
                 refreshDuration()
+                applyVideoDisplayMode()
                 attachPendingSubtitleIfPossible()
 
             case .paused:
