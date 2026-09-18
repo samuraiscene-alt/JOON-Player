@@ -99,7 +99,7 @@ struct TrimEditorView: View {
 
     private var rangeSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label("자를 구간", systemImage: "timeline.selection")
+            Label("자를 구간", systemImage: "scissors")
                 .font(.headline)
 
             trimSlider(
@@ -440,9 +440,11 @@ enum VideoTrimService {
             )
         )
 
+        nonisolated(unsafe) let localExporter = exporter
+
         return try await withCheckedThrowingContinuation { continuation in
-            exporter.exportAsynchronously {
-                switch exporter.status {
+            localExporter.exportAsynchronously {
+                switch localExporter.status {
                 case .completed:
                     continuation.resume(returning: outputURL)
 
@@ -451,7 +453,7 @@ enum VideoTrimService {
 
                 case .failed:
                     continuation.resume(
-                        throwing: TrimError.failed(exporter.error)
+                        throwing: TrimError.failed(localExporter.error)
                     )
 
                 default:
