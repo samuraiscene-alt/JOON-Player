@@ -14,6 +14,7 @@ struct PlayerScreen: View {
     @State private var showSettings = false
     @State private var showTrimEditor = false
     @State private var showRepairView = false
+    @State private var showMediaInfo = false
     @State private var showPlaylist = false
     @State private var isControlsLocked = false
     @State private var seekGestureFeedback: SeekGestureFeedback?
@@ -121,6 +122,9 @@ struct PlayerScreen: View {
         }
         .sheet(isPresented: $showRepairView) {
             VideoRepairView(player: player)
+        }
+        .sheet(isPresented: $showMediaInfo) {
+            MediaInfoView(player: player)
         }
         .sheet(isPresented: $showPlaylist) {
             PlaybackQueueView(
@@ -417,6 +421,10 @@ struct PlayerScreen: View {
                     onRepairVideo: {
                         showSettings = false
                         showRepairView = true
+                    },
+                    onShowMediaInfo: {
+                        showSettings = false
+                        showMediaInfo = true
                     }
                 )
                 .padding(.top, 58)
@@ -943,6 +951,7 @@ struct PlayerScreen: View {
         showVolumePopup = false
         showSettings = false
         showPlaylist = false
+        showMediaInfo = false
         seekFeedbackTask?.cancel()
         horizontalSeekFeedbackTask?.cancel()
         verticalAdjustmentFeedbackTask?.cancel()

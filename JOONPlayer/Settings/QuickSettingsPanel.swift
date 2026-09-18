@@ -5,6 +5,7 @@ struct QuickSettingsPanel: View {
     let onChooseAnotherVideo: () -> Void
     let onChooseSubtitle: () -> Void
     let onRepairVideo: () -> Void
+    let onShowMediaInfo: () -> Void
 
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
@@ -56,6 +57,31 @@ struct QuickSettingsPanel: View {
                     .overlay(.white.opacity(0.12))
 
                 repairRow
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                Button(action: onShowMediaInfo) {
+                    HStack {
+                        Label(
+                            "재생 정보",
+                            systemImage: "info.circle"
+                        )
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.white.opacity(0.42))
+                    }
+                    .font(.subheadline)
+                    .frame(
+                        maxWidth: .infinity,
+                        alignment: .leading
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
 
                 Divider()
                     .overlay(.white.opacity(0.12))

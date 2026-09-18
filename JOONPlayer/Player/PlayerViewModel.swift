@@ -28,6 +28,35 @@ struct MediaTrackOption: Identifiable, Equatable {
     let isSelected: Bool
 }
 
+struct MediaInfoField: Identifiable, Equatable {
+    let id: String
+    let label: String
+    let value: String
+
+    init(
+        _ label: String,
+        _ value: String
+    ) {
+        id = label
+        self.label = label
+        self.value = value
+    }
+}
+
+struct MediaInfoTrack: Identifiable, Equatable {
+    let id: String
+    let title: String
+    let isSelected: Bool
+    let fields: [MediaInfoField]
+}
+
+struct MediaInfoSnapshot: Equatable {
+    let fileFields: [MediaInfoField]
+    let videoTracks: [MediaInfoTrack]
+    let audioTracks: [MediaInfoTrack]
+    let textTracks: [MediaInfoTrack]
+}
+
 struct MediaChapterOption: Identifiable, Equatable {
     let id: Int
     let name: String
@@ -720,6 +749,222 @@ final class PlayerViewModel: NSObject, ObservableObject {
         applyVideoDisplayMode()
     }
 
+    func mediaInfoSnapshot() -> MediaInfoSnapshot {
+        let url = securityScopedURL
+
+        let fileSize = try? url?.resourceValues(
+            forKeys: [.fileSizeKey]
+        ).fileSize
+
+        let fileFields: [MediaInfoField] = [
+            MediaInfoField(
+                "파일명",
+                fileName.isEmpty ? "알 수 없음" : fileName
+            ),
+            MediaInfoField(
+                "형식",
+                url?.pathExtension.uppercased().isEmpty == false
+                    ? url!.pathExtension.uppercased()
+                    : "알 수 없음"
+            ),
+            MediaInfoField(
+                "파일 크기",
+                fileSize.flatMap { $0 }.map {
+                    ByteCountFormatter.string(
+                        fromByteCount: Int64($0),
+                        countStyle: .file
+                    )
+                } ?? "알 수 없음"
+            ),
+            MediaInfoField(
+                "재생 시간",
+                durationSeconds > 0
+                    ? Self.formatTime(durationSeconds)
+                    : "알 수 없음"
+            )
+        ]
+
+        let videoInfo = mediaPlayer.videoTracks.enumerated().map {
+            index,
+            track in
+
+            let video = track.video
+            let width = Int(video?.width ?? 0)
+            let height = Int(video?.height ?? 0)
+            let frameRate = Int(video?.frameRate ?? 0)
+            let frameRateDenominator = max(
+                Int(video?.frameRateDenominator ?? 0),
+                1
+            )
+
+            var fields = [
+                MediaInfoField(
+                    "코덱",
+                    mediaInfoCodecName(track)
+                )
+            ]
+
+            if width > 0, height > 0 {
+                fields.append(
+                    MediaInfoField(
+                        "해상도",
+                        "\(width) × \(height)"
+                    )
+                )
+            }
+
+            if frameRate > 0 {
+                let fps =
+                    Double(frameRate)
+                    / Double(frameRateDenominator)
+
+                fields.append(
+                    MediaInfoField(
+                        "FPS",
+                        fps.formatted(
+                            .number.precision(
+                                .fractionLength(0...3)
+                            )
+                        )
+                    )
+                )
+            }
+
+            if track.bitrate > 0 {
+                fields.append(
+                    MediaInfoField(
+                        "비트레이트",
+                        formatMediaBitrate(track.bitrate)
+                    )
+                )
+            }
+
+            if let language = normalizedOptionalText(
+                track.language
+            ) {
+                fields.append(
+                    MediaInfoField("언어", language)
+                )
+            }
+
+            return MediaInfoTrack(
+                id: track.trackId,
+                title: normalizedTrackName(
+                    track.trackName,
+                    fallback: "비디오 \(index + 1)"
+                ),
+                isSelected: track.isSelected,
+                fields: fields
+            )
+        }
+
+        let audioInfo = mediaPlayer.audioTracks.enumerated().map {
+            index,
+            track in
+
+            let audio = track.audio
+            let channels = Int(audio?.channelsNumber ?? 0)
+            let sampleRate = Int(audio?.rate ?? 0)
+
+            var fields = [
+                MediaInfoField(
+                    "코덱",
+                    mediaInfoCodecName(track)
+                )
+            ]
+
+            if channels > 0 {
+                fields.append(
+                    MediaInfoField(
+                        "채널",
+                        formatAudioChannels(channels)
+                    )
+                )
+            }
+
+            if sampleRate > 0 {
+                fields.append(
+                    MediaInfoField(
+                        "샘플레이트",
+                        "\(sampleRate.formatted()) Hz"
+                    )
+                )
+            }
+
+            if track.bitrate > 0 {
+                fields.append(
+                    MediaInfoField(
+                        "비트레이트",
+                        formatMediaBitrate(track.bitrate)
+                    )
+                )
+            }
+
+            if let language = normalizedOptionalText(
+                track.language
+            ) {
+                fields.append(
+                    MediaInfoField("언어", language)
+                )
+            }
+
+            return MediaInfoTrack(
+                id: track.trackId,
+                title: normalizedTrackName(
+                    track.trackName,
+                    fallback: "오디오 \(index + 1)"
+                ),
+                isSelected: track.isSelected,
+                fields: fields
+            )
+        }
+
+        let textInfo = mediaPlayer.textTracks.enumerated().map {
+            index,
+            track in
+
+            var fields = [
+                MediaInfoField(
+                    "코덱",
+                    mediaInfoCodecName(track)
+                )
+            ]
+
+            if let encoding = normalizedOptionalText(
+                track.text?.encoding
+            ) {
+                fields.append(
+                    MediaInfoField("인코딩", encoding)
+                )
+            }
+
+            if let language = normalizedOptionalText(
+                track.language
+            ) {
+                fields.append(
+                    MediaInfoField("언어", language)
+                )
+            }
+
+            return MediaInfoTrack(
+                id: track.trackId,
+                title: normalizedTrackName(
+                    track.trackName,
+                    fallback: "자막 \(index + 1)"
+                ),
+                isSelected: track.isSelected,
+                fields: fields
+            )
+        }
+
+        return MediaInfoSnapshot(
+            fileFields: fileFields,
+            videoTracks: videoInfo,
+            audioTracks: audioInfo,
+            textTracks: textInfo
+        )
+    }
+
     func refreshAvailableTracks() {
         audioTrackOptions = mediaPlayer.audioTracks.enumerated().map {
             index,
@@ -1082,6 +1327,63 @@ final class PlayerViewModel: NSObject, ObservableObject {
         )
 
         return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func normalizedOptionalText(
+        _ value: String?
+    ) -> String? {
+        guard let value else { return nil }
+
+        let trimmed = value.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func mediaInfoCodecName(
+        _ track: VLCMediaPlayer.Track
+    ) -> String {
+        let name = track.codecName().trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        return name.isEmpty ? "알 수 없음" : name
+    }
+
+    private func formatMediaBitrate(
+        _ bitrate: UInt32
+    ) -> String {
+        let value = Double(bitrate)
+
+        if value >= 1_000_000 {
+            return String(
+                format: "%.2f Mbps",
+                value / 1_000_000
+            )
+        }
+
+        if value >= 1_000 {
+            return String(
+                format: "%.0f kbps",
+                value / 1_000
+            )
+        }
+
+        return "\(bitrate) bps"
+    }
+
+    private func formatAudioChannels(
+        _ channels: Int
+    ) -> String {
+        switch channels {
+        case 1:
+            return "1채널 · 모노"
+        case 2:
+            return "2채널 · 스테레오"
+        default:
+            return "\(channels)채널"
+        }
     }
 
     private func configureAudioSession() {
