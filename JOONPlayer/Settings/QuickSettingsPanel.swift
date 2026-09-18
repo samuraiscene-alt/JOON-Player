@@ -3,6 +3,7 @@ import SwiftUI
 struct QuickSettingsPanel: View {
     @ObservedObject var player: PlayerViewModel
     let onChooseAnotherVideo: () -> Void
+    let onChooseSubtitle: () -> Void
 
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
@@ -12,36 +13,12 @@ struct QuickSettingsPanel: View {
                 .font(.headline)
                 .foregroundStyle(.white)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Label("재생 속도", systemImage: "speedometer")
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.78))
+            playbackRateSection
 
-                HStack(spacing: 7) {
-                    ForEach(rates, id: \.self) { rate in
-                        Button {
-                            player.setPlaybackRate(rate)
-                        } label: {
-                            Text(rateLabel(rate))
-                                .font(.caption.weight(.semibold))
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 7)
-                                .background(
-                                    player.playbackRate == rate
-                                    ? Color.white
-                                    : Color.white.opacity(0.1)
-                                )
-                                .foregroundStyle(
-                                    player.playbackRate == rate
-                                    ? Color.black
-                                    : Color.white
-                                )
-                                .clipShape(Capsule())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+            Divider()
+                .overlay(.white.opacity(0.12))
+
+            subtitleSection
 
             Divider()
                 .overlay(.white.opacity(0.12))
@@ -53,7 +30,6 @@ struct QuickSettingsPanel: View {
             .buttonStyle(.plain)
             .foregroundStyle(.white)
 
-            disabledRow(title: "자막", icon: "captions.bubble")
             disabledRow(title: "화면비율", icon: "aspectratio")
             disabledRow(title: "PiP", icon: "pip")
         }
@@ -61,6 +37,107 @@ struct QuickSettingsPanel: View {
         .frame(maxWidth: 330)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private var playbackRateSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("재생 속도", systemImage: "speedometer")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+            HStack(spacing: 7) {
+                ForEach(rates, id: \.self) { rate in
+                    Button {
+                        player.setPlaybackRate(rate)
+                    } label: {
+                        Text(rateLabel(rate))
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(
+                                player.playbackRate == rate
+                                ? Color.white
+                                : Color.white.opacity(0.1)
+                            )
+                            .foregroundStyle(
+                                player.playbackRate == rate
+                                ? Color.black
+                                : Color.white
+                            )
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    private var subtitleSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label("외부 자막", systemImage: "captions.bubble")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                if player.subtitleWasAutoLoaded {
+                    Text("자동")
+                        .font(.caption2.weight(.semibold))
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(.white.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+
+            if let subtitleName = player.subtitleName {
+                Text(subtitleName)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.66))
+                    .lineLimit(1)
+            } else {
+                Text("연결된 SRT 자막 없음")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.45))
+            }
+
+            Button(action: onChooseSubtitle) {
+                Label("SRT 파일 선택", systemImage: "doc.badge.plus")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white)
+
+            if player.subtitleName != nil {
+                HStack(spacing: 8) {
+                    Button {
+                        player.adjustSubtitleDelay(byMilliseconds: -100)
+                    } label: {
+                        Text("-0.1")
+                            .frame(minWidth: 42)
+                    }
+
+                    Button {
+                        player.resetSubtitleDelay()
+                    } label: {
+                        Text(player.formattedSubtitleDelay)
+                            .font(.caption.monospacedDigit())
+                            .frame(minWidth: 62)
+                    }
+
+                    Button {
+                        player.adjustSubtitleDelay(byMilliseconds: 100)
+                    } label: {
+                        Text("+0.1")
+                            .frame(minWidth: 42)
+                    }
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+                .tint(.white.opacity(0.82))
+            }
+        }
     }
 
     private func disabledRow(title: String, icon: String) -> some View {

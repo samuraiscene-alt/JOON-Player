@@ -4,6 +4,7 @@ struct PlayerScreen: View {
     @ObservedObject var player: PlayerViewModel
     let isLandscape: Bool
     let onChooseAnotherVideo: () -> Void
+    let onChooseSubtitle: () -> Void
 
     @State private var controlsVisible = true
     @State private var showVolumePopup = false
@@ -87,6 +88,10 @@ struct PlayerScreen: View {
                     onChooseAnotherVideo: {
                         showSettings = false
                         onChooseAnotherVideo()
+                    },
+                    onChooseSubtitle: {
+                        showSettings = false
+                        onChooseSubtitle()
                     }
                 )
                 .padding(.top, 58)

@@ -1,8 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @StateObject private var player = PlayerViewModel()
     @State private var isVideoPickerPresented = false
+    @State private var isSubtitlePickerPresented = false
+
+    private var srtType: UTType {
+        UTType(filenameExtension: "srt") ?? .plainText
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -17,6 +23,9 @@ struct ContentView: View {
                         isLandscape: isLandscape,
                         onChooseAnotherVideo: {
                             isVideoPickerPresented = true
+                        },
+                        onChooseSubtitle: {
+                            isSubtitlePickerPresented = true
                         }
                     )
                 } else {
@@ -38,6 +47,20 @@ struct ContentView: View {
 
             case .failure(let error):
                 player.present(error: "파일을 열 수 없습니다.\n\(error.localizedDescription)")
+            }
+        }
+        .fileImporter(
+            isPresented: $isSubtitlePickerPresented,
+            allowedContentTypes: [srtType],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case .success(let urls):
+                guard let url = urls.first else { return }
+                player.loadSubtitle(url: url)
+
+            case .failure(let error):
+                player.present(error: "자막 파일을 열 수 없습니다.\n\(error.localizedDescription)")
             }
         }
         .alert(
