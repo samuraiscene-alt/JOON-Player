@@ -19,7 +19,7 @@ FFmpegKitNext는 기존 프로젝트의 원 저자가 이어서 유지하는 후
 `FFmpegKitNextRuntime`은 `#if canImport(ffmpegkit)`로 동작한다.
 
 따라서 지금 저장소는 FFmpegKitNext 바이너리가 없어도 나머지 코드 구조를 유지하고,
-나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 고급 자르기, 정확 자르기, 복구/리먹스 경로가 자동으로 활성화된다.
+나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 고급 자르기, 정확 자르기, 빠른 복구, 2차 재인코딩 복구 경로가 자동으로 활성화된다.
 
 모든 FFmpeg 명령은 하나의 전용 serial queue를 공유한다.
 FFmpeg fftools의 process-global 상태 때문에 자르기, 복구, 향후 썸네일/변환 작업을 동시에 실행하지 않도록 하기 위한 구조다.
@@ -68,36 +68,10 @@ FFmpegKitNext 공식 Apple 문서는 Xcode 26.0+와 Command Line Tools를 요구
 
 를 사용한다.
 
-이 방식은 빠르고 원본 화질을 다시 압축하지 않지만, 코덱의 키프레임 위치 때문에 시작점이 프레임 단위로 완전히 정확하지 않을 수 있다.
-
 ## 정확 자르기
 
 사용자가 **정확 자르기**를 선택하면 빠른 자르기와 분리된 재인코딩 경로를 사용한다.
-
-- MP4 / MOV / M4V: AVFoundation의 `AVAssetExportPresetHighestQuality` + 정확한 `timeRange`를 우선 사용한다.
-- MKV / AVI / TS / M2TS / WebM / FLV 등: FFmpegKitNext가 연결되어 있을 때 FFmpeg 재인코딩 경로를 사용한다.
-- FFmpeg 경로에서는 입력을 연 뒤 `-ss`를 적용해 목표 시점까지 디코딩하므로 키프레임 기반 스트림 복사보다 정확한 컷을 만든다.
-- 출력은 MP4, 영상은 FFmpeg 내장 `mpeg4` 인코더, 오디오는 `aac`를 사용한다.
-- 이 방식은 재인코딩이므로 처리 시간이 길어지고 파일 크기나 화질이 달라질 수 있다.
-- 외부 SRT는 포함하지 않는다.
-
-FFmpeg 정확 자르기 명령의 핵심 구조:
-
-```
--i <input>
--ss <start>
--t <duration>
--map 0:v:0?
--map 0:a:0?
--c:v mpeg4
--q:v 2
--c:a aac
--b:a 192k
--movflags +faststart
-<output.mp4>
-```
-
-실제 컷 위치는 임의의 소수점 시간이 아니라 소스 영상의 가장 가까운 프레임 경계에 맞춰진다.
+MP4 / MOV / M4V는 AVFoundation을 우선 사용하고, 기타 형식은 FFmpegKitNext 연결 시 재인코딩한다.
 
 ## 빠른 복구 / 리먹스
 
@@ -116,18 +90,42 @@ FFmpeg 정확 자르기 명령의 핵심 구조:
 <output.mkv>
 ```
 
-목적은 다음과 같다.
+원본 스트림을 다시 압축하지 않기 때문에 빠르고 화질 손실이 거의 없지만, 손상된 스트림 자체나 출력 컨테이너 호환 문제 때문에 실패할 수 있다.
 
-- 손상 패킷을 가능한 경우 건너뛰기
-- 누락/비정상 타임스탬프를 가능한 범위에서 다시 생성
-- 오래되거나 비정상적인 컨테이너 인덱스 문제를 새 컨테이너로 재작성
-- 재인코딩 없이 원본 스트림을 최대한 보존
+## 2차 재인코딩 복구
 
-이 기능은 **원본 데이터를 복원하는 복구 프로그램이 아니다**.
-이미 유실된 프레임, 읽을 수 없는 코덱 데이터, MP4의 핵심 메타데이터가 완전히 사라진 경우 등은 리먹스만으로 복구되지 않을 수 있다.
+빠른 복구가 실패했을 때 사용자가 **2차 재인코딩**을 선택할 수 있다.
 
-외부 SRT 자막은 복구본에 자동으로 합치지 않는다.
-원본 안에 들어 있던 내장 자막 스트림만 가능한 경우 복사한다.
+```
+-fflags +genpts+discardcorrupt
+-err_detect ignore_err
+-analyzeduration 100M
+-probesize 100M
+-i <input>
+-map 0:v:0?
+-map 0:a:0?
+-map_metadata 0
+-c:v mpeg4
+-q:v 4
+-c:a aac
+-b:a 160k
+-max_muxing_queue_size 4096
+-movflags +faststart
+-avoid_negative_ts make_zero
+<output.mp4>
+```
+
+이 경로는 다음을 목표로 한다.
+
+- 스트림 복사 대신 디코딩 가능한 프레임을 새 영상으로 재인코딩
+- 더 긴 probe/analyze 구간으로 불완전한 스트림 정보 재탐색
+- 손상 패킷을 가능한 범위에서 건너뛰기
+- 표준 MP4 + MPEG-4 video + AAC로 다시 저장해 컨테이너/코덱 복사 호환 문제 회피
+
+대신 처리 시간이 오래 걸리고 영상이 다시 압축되며, 파일 크기와 화질이 달라질 수 있다.
+2차 복구에서는 내장 자막을 복사하지 않는다.
+
+이 방식도 이미 유실된 프레임, 읽을 수 없는 헤더, 완전히 사라진 MP4 moov 메타데이터 등을 만들어내는 복원 기술은 아니다.
 
 ## 라이선스
 

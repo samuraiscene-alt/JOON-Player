@@ -5,6 +5,7 @@ struct VideoRepairView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var player: PlayerViewModel
 
+    @State private var repairMode: VideoRepairMode = .quickRemux
     @State private var isRepairing = false
     @State private var repairedURL: URL?
     @State private var showShareSheet = false
@@ -18,8 +19,9 @@ struct VideoRepairView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     sourceSection
-                    explanationSection
                     engineSection
+                    repairModeSection
+                    explanationSection
 
                     if let failureSummary {
                         failureSection(failureSummary)
@@ -43,6 +45,11 @@ struct VideoRepairView: View {
         }
         .preferredColorScheme(.dark)
         .interactiveDismissDisabled(isRepairing)
+        .onChange(of: repairMode) { _, _ in
+            failureSummary = nil
+            showTechnicalDetails = false
+            didCopyTechnicalLog = false
+        }
         .sheet(isPresented: $showShareSheet) {
             if let repairedURL {
                 RepairShareSheet(items: [repairedURL])
@@ -79,26 +86,6 @@ struct VideoRepairView: View {
         }
     }
 
-    private var explanationSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("빠른 복구 / 리먹스", systemImage: "wrench.and.screwdriver")
-                .font(.headline)
-
-            Text("재인코딩 없이 읽을 수 있는 영상·오디오·내장 자막 스트림을 새 MKV 컨테이너에 다시 담습니다. 가능한 경우 손상 패킷을 건너뛰고 타임스탬프를 다시 만들어 재생 가능성을 높입니다.")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.72))
-                .fixedSize(horizontal: false, vertical: true)
-
-            Text("이미 사라진 영상 데이터나 심하게 깨진 코덱 데이터, MP4의 핵심 메타데이터가 완전히 유실된 경우까지 복원할 수 있는 기능은 아닙니다.")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.48))
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private var engineSection: some View {
         HStack(spacing: 10) {
             Image(
@@ -125,6 +112,68 @@ struct VideoRepairView: View {
         .foregroundStyle(.white.opacity(0.82))
     }
 
+    private var repairModeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("복구 방식", systemImage: "arrow.triangle.2.circlepath")
+                .font(.headline)
+
+            Picker("복구 방식", selection: $repairMode) {
+                ForEach(VideoRepairMode.allCases) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(repairMode.explanation)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.55))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var explanationSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                repairMode == .quickRemux
+                ? "빠른 복구 / 리먹스"
+                : "2차 재인코딩 복구",
+                systemImage: repairMode == .quickRemux
+                ? "wrench.and.screwdriver"
+                : "arrow.clockwise.circle"
+            )
+            .font(.headline)
+
+            if repairMode == .quickRemux {
+                Text("재인코딩 없이 읽을 수 있는 영상·오디오·내장 자막 스트림을 새 MKV 컨테이너에 다시 담습니다. 가능한 경우 손상 패킷을 건너뛰고 타임스탬프를 다시 만들어 재생 가능성을 높입니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("화질 손실이 거의 없고 빠르지만, 스트림 자체가 깨졌거나 코덱을 그대로 복사할 수 없는 경우에는 실패할 수 있습니다.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.48))
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("FFmpeg가 읽을 수 있는 프레임과 오디오를 다시 디코딩한 뒤 MPEG-4 video + AAC의 새 MP4로 재인코딩합니다. 빠른 복구에서 스트림 복사가 실패한 파일을 일부 건지는 용도입니다.")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("처리 시간이 오래 걸리고 화질·용량이 달라질 수 있으며, 내장 자막은 2차 복구본에 포함하지 않습니다. 이미 유실된 프레임이나 읽을 수 없는 헤더까지 되살릴 수 있는 기능은 아닙니다.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.48))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
     private func failureSection(
         _ report: FFmpegFailureSummary
     ) -> some View {
@@ -146,6 +195,24 @@ struct VideoRepairView: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.72))
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if
+                repairMode == .quickRemux,
+                report.canTryReencodeRepair,
+                VideoRepairService.isAvailable
+            {
+                Button {
+                    repairMode = .reencode
+                    repairVideo()
+                } label: {
+                    Label(
+                        "2차 재인코딩 복구 시도",
+                        systemImage: "arrow.clockwise.circle"
+                    )
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
             }
 
             DisclosureGroup(
@@ -197,10 +264,14 @@ struct VideoRepairView: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Image(systemName: "wrench.and.screwdriver")
+                    Image(
+                        systemName: repairMode == .quickRemux
+                        ? "wrench.and.screwdriver"
+                        : "arrow.clockwise.circle"
+                    )
                 }
 
-                Text(isRepairing ? "복구본 만드는 중…" : "새 MKV 복구본 만들기")
+                Text(repairButtonTitle)
                     .font(.headline)
             }
             .frame(maxWidth: .infinity)
@@ -212,6 +283,18 @@ struct VideoRepairView: View {
             || player.currentMediaURL == nil
             || !VideoRepairService.isAvailable
         )
+    }
+
+    private var repairButtonTitle: String {
+        if isRepairing {
+            return repairMode == .quickRemux
+                ? "MKV 복구본 만드는 중…"
+                : "MP4 2차 복구본 만드는 중…"
+        }
+
+        return repairMode == .quickRemux
+            ? "새 MKV 복구본 만들기"
+            : "2차 MP4 복구본 만들기"
     }
 
     private func repairVideo() {
@@ -234,7 +317,8 @@ struct VideoRepairView: View {
         Task {
             do {
                 let url = try await VideoRepairService.repair(
-                    sourceURL: sourceURL
+                    sourceURL: sourceURL,
+                    mode: repairMode
                 )
 
                 await MainActor.run {
