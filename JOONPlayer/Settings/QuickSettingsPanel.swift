@@ -40,6 +40,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                chapterSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 subtitleSection
 
                 Divider()
@@ -69,6 +74,7 @@ struct QuickSettingsPanel: View {
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onAppear {
             player.refreshAvailableTracks()
+            player.refreshAvailableChapters()
         }
     }
 
@@ -397,6 +403,102 @@ struct QuickSettingsPanel: View {
         .padding(.vertical, 6)
         .background(.white.opacity(0.1))
         .clipShape(Capsule())
+    }
+
+    private var chapterSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label("챕터", systemImage: "list.number")
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+            if player.chapterOptions.count > 1 {
+                HStack(spacing: 8) {
+                    Button {
+                        player.playPreviousChapter()
+                    } label: {
+                        Image(systemName: "backward.end.fill")
+                            .frame(width: 36, height: 34)
+                    }
+                    .disabled(!player.canPlayPreviousChapter)
+                    .opacity(
+                        player.canPlayPreviousChapter
+                        ? 1
+                        : 0.35
+                    )
+
+                    Menu {
+                        ForEach(player.chapterOptions) { chapter in
+                            Button {
+                                player.selectChapter(
+                                    index: chapter.id
+                                )
+                            } label: {
+                                Label(
+                                    "\(chapter.startTimeText)  \(chapter.name)",
+                                    systemImage: chapter.isCurrent
+                                        ? "checkmark"
+                                        : "circle"
+                                )
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Text(player.currentChapterName)
+                                .font(.caption.weight(.medium))
+                                .lineLimit(1)
+
+                            Image(
+                                systemName:
+                                    "chevron.up.chevron.down"
+                            )
+                            .font(
+                                .system(
+                                    size: 9,
+                                    weight: .semibold
+                                )
+                            )
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 7)
+                        .background(.white.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+
+                    Button {
+                        player.playNextChapter()
+                    } label: {
+                        Image(systemName: "forward.end.fill")
+                            .frame(width: 36, height: 34)
+                    }
+                    .disabled(!player.canPlayNextChapter)
+                    .opacity(
+                        player.canPlayNextChapter
+                        ? 1
+                        : 0.35
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+
+                if let current = player.chapterOptions.first(
+                    where: { $0.isCurrent }
+                ) {
+                    Text(
+                        "현재: \(current.startTimeText) · "
+                        + "\(current.name)"
+                    )
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.48))
+                    .lineLimit(1)
+                }
+            } else {
+                Text("현재 영상에는 이동할 챕터가 없습니다.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.42))
+            }
+        }
     }
 
     private var subtitleSection: some View {

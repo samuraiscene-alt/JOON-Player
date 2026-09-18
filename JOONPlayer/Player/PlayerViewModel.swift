@@ -28,6 +28,36 @@ struct MediaTrackOption: Identifiable, Equatable {
     let isSelected: Bool
 }
 
+struct MediaChapterOption: Identifiable, Equatable {
+    let id: Int
+    let name: String
+    let startSeconds: Double
+    let durationSeconds: Double
+    let isCurrent: Bool
+
+    var startTimeText: String {
+        let total = max(Int(startSeconds.rounded(.down)), 0)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                seconds
+            )
+        }
+
+        return String(
+            format: "%02d:%02d",
+            minutes,
+            seconds
+        )
+    }
+}
+
 struct PlaybackQueueItem: Identifiable, Equatable {
     let id: UUID
     let url: URL
@@ -159,6 +189,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     @Published private(set) var audioTrackOptions: [MediaTrackOption] = []
     @Published private(set) var textTrackOptions: [MediaTrackOption] = []
+    @Published private(set) var chapterOptions: [MediaChapterOption] = []
 
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
@@ -493,6 +524,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         audioTrackOptions = []
         textTrackOptions = []
+        chapterOptions = []
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -552,6 +584,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         audioTrackOptions = []
         textTrackOptions = []
+        chapterOptions = []
 
         subtitleName = nil
         subtitleWasAutoLoaded = false
@@ -747,6 +780,76 @@ final class PlayerViewModel: NSObject, ObservableObject {
         refreshAvailableTracks()
     }
 
+    func refreshAvailableChapters() {
+        let titleIndex = mediaPlayer.currentTitleIndex >= 0
+            ? mediaPlayer.currentTitleIndex
+            : 0
+
+        let descriptions = mediaPlayer.chapterDescriptions(
+            ofTitle: titleIndex
+        )
+
+        chapterOptions = descriptions.enumerated().map {
+            position,
+            chapter in
+
+            let startMilliseconds =
+                chapter.timeOffset.value?.doubleValue
+                ?? Double(chapter.timeOffset.intValue)
+
+            let durationMilliseconds =
+                chapter.durationTime.value?.doubleValue
+                ?? Double(chapter.durationTime.intValue)
+
+            let trimmedName = chapter.name?
+                .trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                ?? ""
+
+            return MediaChapterOption(
+                id: Int(chapter.chapterIndex),
+                name: trimmedName.isEmpty
+                    ? "챕터 \(position + 1)"
+                    : trimmedName,
+                startSeconds: max(startMilliseconds / 1000.0, 0),
+                durationSeconds: max(
+                    durationMilliseconds / 1000.0,
+                    0
+                ),
+                isCurrent: chapter.isCurrent
+                    || Int(chapter.chapterIndex)
+                        == Int(mediaPlayer.currentChapterIndex)
+            )
+        }
+    }
+
+    func selectChapter(index: Int) {
+        guard chapterOptions.contains(
+            where: { $0.id == index }
+        ) else {
+            refreshAvailableChapters()
+            return
+        }
+
+        mediaPlayer.currentChapterIndex = Int32(index)
+        refreshAvailableChapters()
+    }
+
+    func playPreviousChapter() {
+        guard canPlayPreviousChapter else { return }
+
+        mediaPlayer.previousChapter()
+        refreshAvailableChapters()
+    }
+
+    func playNextChapter() {
+        guard canPlayNextChapter else { return }
+
+        mediaPlayer.nextChapter()
+        refreshAvailableChapters()
+    }
+
     func loadSubtitle(url: URL) {
         guard hasMedia else {
             errorMessage = "동영상을 먼저 연 뒤 자막을 선택해 주세요."
@@ -838,6 +941,30 @@ final class PlayerViewModel: NSObject, ObservableObject {
     var selectedTextTrackName: String {
         textTrackOptions.first(where: { $0.isSelected })?.name
             ?? "끔"
+    }
+
+    var currentChapterName: String {
+        chapterOptions.first(where: { $0.isCurrent })?.name
+            ?? chapterOptions.first(
+                where: {
+                    $0.id == Int(mediaPlayer.currentChapterIndex)
+                }
+            )?.name
+            ?? "챕터"
+    }
+
+    var canPlayPreviousChapter: Bool {
+        guard chapterOptions.count > 1 else { return false }
+
+        return Int(mediaPlayer.currentChapterIndex) > 0
+    }
+
+    var canPlayNextChapter: Bool {
+        guard chapterOptions.count > 1 else { return false }
+
+        let currentIndex = Int(mediaPlayer.currentChapterIndex)
+        return currentIndex >= 0
+            && currentIndex < chapterOptions.count - 1
     }
 
     var playlistCount: Int {
@@ -1074,6 +1201,31 @@ final class PlayerViewModel: NSObject, ObservableObject {
         seek(to: pendingResumeSeconds)
     }
 
+    private func refreshCurrentChapterSelectionIfNeeded() {
+        guard !chapterOptions.isEmpty else { return }
+
+        let currentIndex = Int(mediaPlayer.currentChapterIndex)
+
+        guard chapterOptions.contains(
+            where: {
+                $0.id == currentIndex
+                    && $0.isCurrent
+            }
+        ) == false else {
+            return
+        }
+
+        chapterOptions = chapterOptions.map { chapter in
+            MediaChapterOption(
+                id: chapter.id,
+                name: chapter.name,
+                startSeconds: chapter.startSeconds,
+                durationSeconds: chapter.durationSeconds,
+                isCurrent: chapter.id == currentIndex
+            )
+        }
+    }
+
     private func refreshSleepTimer() {
         guard
             sleepTimerMode != .off,
@@ -1262,6 +1414,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             mediaPlayer.currentSubTitleFontScale = subtitleFontScale
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()
+            refreshAvailableChapters()
 
         case .paused:
             isLoading = false
@@ -1269,6 +1422,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()
+            refreshAvailableChapters()
 
         case .stopping:
             isLoading = false
@@ -1332,6 +1486,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         refreshDuration()
         lastObservedPlaybackSecond = currentSeconds
         applyPendingResumeIfPossible()
+        refreshCurrentChapterSelectionIfNeeded()
         enforceABRepeatIfNeeded()
         saveResumeProgressIfNeeded()
     }
