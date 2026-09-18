@@ -5,6 +5,10 @@ struct PlayerScreen: View {
     @Environment(\.accessibilityVoiceOverEnabled)
     private var isVoiceOverEnabled
 
+    @AppStorage(PlayerQuickAction.storageKey)
+    private var quickActionStorage =
+        PlayerQuickAction.defaultStorageValue
+
     @ObservedObject var player: PlayerViewModel
     @ObservedObject var savedPlaylistStore: SavedPlaylistStore
     let isLandscape: Bool
@@ -465,6 +469,15 @@ struct PlayerScreen: View {
                     .frame(height: 8)
             }
 
+            if !selectedQuickActions.isEmpty {
+                quickActionBar
+                    .padding(
+                        .horizontal,
+                        isLandscape ? 28 : 16
+                    )
+                    .padding(.bottom, 6)
+            }
+
             PlaybackControls(
                 player: player,
                 isLandscape: isLandscape,
@@ -521,6 +534,57 @@ struct PlayerScreen: View {
                     .padding(.bottom, isLandscape ? 88 : 108)
             }
         }
+    }
+
+    private var selectedQuickActions: [PlayerQuickAction] {
+        PlayerQuickAction.decoded(
+            from: quickActionStorage
+        )
+    }
+
+    private var quickActionBar: some View {
+        HStack(spacing: 10) {
+            ForEach(selectedQuickActions) { action in
+                Button {
+                    performQuickAction(action)
+                } label: {
+                    Image(
+                        systemName:
+                            quickActionSystemImage(action)
+                    )
+                    .font(
+                        .system(
+                            size: 18,
+                            weight: .medium
+                        )
+                    )
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white)
+                .disabled(
+                    !isQuickActionEnabled(action)
+                )
+                .opacity(
+                    isQuickActionEnabled(action)
+                    ? 1
+                    : 0.35
+                )
+                .accessibilityLabel(action.title)
+                .accessibilityHint(
+                    quickActionAccessibilityHint(
+                        action
+                    )
+                )
+            }
+        }
+        .frame(
+            maxWidth: .infinity,
+            alignment: .center
+        )
     }
 
     private var lockedOverlay: some View {
@@ -1142,6 +1206,123 @@ struct PlayerScreen: View {
         isControlsLocked = false
         controlsVisible = true
         scheduleAutoHideIfNeeded()
+    }
+
+    private func performQuickAction(
+        _ action: PlayerQuickAction
+    ) {
+        guard isQuickActionEnabled(action) else {
+            return
+        }
+
+        switch action {
+        case .bookmark:
+            player.addPlaybackBookmark()
+
+        case .snapshot:
+            captureSnapshot()
+
+        case .previousFrame:
+            player.stepToPreviousFrame()
+
+        case .nextFrame:
+            player.stepToNextFrame()
+
+        case .mute:
+            player.toggleMute()
+            showKeyboardVolumeFeedback(
+                value: player.isMuted
+                    ? 0
+                    : player.volume
+            )
+
+        case .pictureInPicture:
+            player.togglePictureInPicture()
+        }
+
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func isQuickActionEnabled(
+        _ action: PlayerQuickAction
+    ) -> Bool {
+        switch action {
+        case .bookmark:
+            return player.canAddPlaybackBookmark
+
+        case .snapshot:
+            return player.canStepFrames
+                && !isCapturingSnapshot
+
+        case .previousFrame, .nextFrame:
+            return player.canStepFrames
+
+        case .mute:
+            return player.hasMedia
+
+        case .pictureInPicture:
+            return player.isPictureInPictureReady
+        }
+    }
+
+    private func quickActionSystemImage(
+        _ action: PlayerQuickAction
+    ) -> String {
+        switch action {
+        case .bookmark:
+            return player.canAddPlaybackBookmark
+                ? "bookmark.badge.plus"
+                : "bookmark.fill"
+
+        case .snapshot:
+            return action.systemImage
+
+        case .previousFrame:
+            return action.systemImage
+
+        case .nextFrame:
+            return action.systemImage
+
+        case .mute:
+            return player.isMuted
+                ? "speaker.slash.fill"
+                : "speaker.wave.2"
+
+        case .pictureInPicture:
+            return player.isPictureInPictureActive
+                ? "pip.exit"
+                : "pip.enter"
+        }
+    }
+
+    private func quickActionAccessibilityHint(
+        _ action: PlayerQuickAction
+    ) -> String {
+        switch action {
+        case .bookmark:
+            return player.canAddPlaybackBookmark
+                ? "현재 재생 위치를 북마크로 저장합니다."
+                : "현재 위치는 이미 북마크에 저장되어 있습니다."
+
+        case .snapshot:
+            return "현재 영상 프레임을 PNG 이미지로 캡처합니다."
+
+        case .previousFrame:
+            return "현재 위치에서 한 프레임 뒤로 이동합니다."
+
+        case .nextFrame:
+            return "현재 위치에서 한 프레임 앞으로 이동합니다."
+
+        case .mute:
+            return player.isMuted
+                ? "음소거를 해제합니다."
+                : "현재 오디오를 음소거합니다."
+
+        case .pictureInPicture:
+            return player.isPictureInPictureActive
+                ? "화면 속 화면 재생을 종료합니다."
+                : "화면 속 화면 재생을 시작합니다."
+        }
     }
 
     private func captureSnapshot() {

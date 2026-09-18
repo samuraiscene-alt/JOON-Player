@@ -11,6 +11,10 @@ struct QuickSettingsPanel: View {
     @Environment(\.dynamicTypeSize)
     private var dynamicTypeSize
 
+    @AppStorage(PlayerQuickAction.storageKey)
+    private var quickActionStorage =
+        PlayerQuickAction.defaultStorageValue
+
     @ObservedObject var player: PlayerViewModel
     let onChooseAnotherVideo: () -> Void
     let onChooseSubtitle: () -> Void
@@ -229,6 +233,8 @@ struct QuickSettingsPanel: View {
 
     private var otherGroupContent: some View {
         VStack(alignment: .leading, spacing: 13) {
+            quickActionConfigurationSection
+            groupDivider
             pictureInPictureRow
             groupDivider
             repairRow
@@ -260,6 +266,203 @@ struct QuickSettingsPanel: View {
         return AnyLayout(
             HStackLayout(spacing: 7)
         )
+    }
+
+    private var selectedQuickActions: [PlayerQuickAction] {
+        PlayerQuickAction.decoded(
+            from: quickActionStorage
+        )
+    }
+
+    private var availableQuickActions: [PlayerQuickAction] {
+        PlayerQuickAction.allCases.filter {
+            !selectedQuickActions.contains($0)
+        }
+    }
+
+    private var quickActionConfigurationSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "퀵 액션",
+                    systemImage: "bolt.circle"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(
+                    "\(selectedQuickActions.count)"
+                    + "/"
+                    + "\(PlayerQuickAction.maximumSelectionCount)"
+                )
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.white.opacity(0.48))
+            }
+
+            Text(
+                "재생 화면 하단에 바로 표시할 기능을 최대 3개까지 선택하고 순서를 바꿀 수 있습니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.44))
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+
+            if selectedQuickActions.isEmpty {
+                Text("현재 선택된 퀵 액션이 없습니다.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(.vertical, 4)
+            } else {
+                VStack(spacing: 5) {
+                    ForEach(selectedQuickActions) { action in
+                        let index =
+                            selectedQuickActions.firstIndex(
+                                of: action
+                            ) ?? 0
+
+                        HStack(spacing: 4) {
+                            Label(
+                                action.title,
+                                systemImage: action.systemImage
+                            )
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(1)
+
+                            Spacer(minLength: 4)
+
+                            Button {
+                                moveQuickAction(
+                                    action,
+                                    offset: -1
+                                )
+                            } label: {
+                                Image(systemName: "arrow.up")
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(index == 0)
+                            .opacity(index == 0 ? 0.3 : 1)
+                            .accessibilityLabel(
+                                "\(action.title) 위로 이동"
+                            )
+
+                            Button {
+                                moveQuickAction(
+                                    action,
+                                    offset: 1
+                                )
+                            } label: {
+                                Image(systemName: "arrow.down")
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(
+                                index
+                                    == selectedQuickActions.count - 1
+                            )
+                            .opacity(
+                                index
+                                    == selectedQuickActions.count - 1
+                                ? 0.3
+                                : 1
+                            )
+                            .accessibilityLabel(
+                                "\(action.title) 아래로 이동"
+                            )
+
+                            Button(role: .destructive) {
+                                removeQuickAction(action)
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .frame(
+                                        width: 44,
+                                        height: 44
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                "\(action.title) 제거"
+                            )
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.leading, 9)
+                        .background(.white.opacity(0.07))
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: 10,
+                                style: .continuous
+                            )
+                        )
+                    }
+                }
+            }
+
+            if
+                selectedQuickActions.count
+                    < PlayerQuickAction.maximumSelectionCount,
+                !availableQuickActions.isEmpty
+            {
+                Menu {
+                    ForEach(availableQuickActions) { action in
+                        Button {
+                            addQuickAction(action)
+                        } label: {
+                            Label(
+                                action.title,
+                                systemImage:
+                                    action.systemImage
+                            )
+                        }
+                    }
+                } label: {
+                    Label(
+                        "퀵 액션 추가",
+                        systemImage: "plus.circle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 44,
+                        alignment: .leading
+                    )
+                }
+                .foregroundStyle(.white)
+            }
+
+            if
+                selectedQuickActions
+                    != PlayerQuickAction.defaultActions
+            {
+                Button {
+                    quickActionStorage =
+                        PlayerQuickAction
+                            .defaultStorageValue
+                } label: {
+                    Label(
+                        "기본 구성으로 복원",
+                        systemImage:
+                            "arrow.counterclockwise"
+                    )
+                    .font(.caption)
+                    .frame(
+                        minHeight: 44,
+                        alignment: .leading
+                    )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.white.opacity(0.66))
+            }
+        }
     }
 
     private var mediaInfoRow: some View {
@@ -1545,6 +1748,60 @@ struct QuickSettingsPanel: View {
         .accessibilityHint(
             "현재 영상을 새 컨테이너로 복구하거나 재인코딩합니다."
         )
+    }
+
+    private func addQuickAction(
+        _ action: PlayerQuickAction
+    ) {
+        var actions = selectedQuickActions
+
+        guard
+            actions.count
+                < PlayerQuickAction.maximumSelectionCount,
+            !actions.contains(action)
+        else {
+            return
+        }
+
+        actions.append(action)
+        quickActionStorage =
+            PlayerQuickAction.encoded(actions)
+    }
+
+    private func removeQuickAction(
+        _ action: PlayerQuickAction
+    ) {
+        var actions = selectedQuickActions
+        actions.removeAll { $0 == action }
+
+        quickActionStorage =
+            PlayerQuickAction.encoded(actions)
+    }
+
+    private func moveQuickAction(
+        _ action: PlayerQuickAction,
+        offset: Int
+    ) {
+        var actions = selectedQuickActions
+
+        guard
+            let index = actions.firstIndex(
+                of: action
+            )
+        else {
+            return
+        }
+
+        let targetIndex = index + offset
+
+        guard actions.indices.contains(targetIndex) else {
+            return
+        }
+
+        actions.swapAt(index, targetIndex)
+
+        quickActionStorage =
+            PlayerQuickAction.encoded(actions)
     }
 
     private func rateLabel(_ rate: Float) -> String {
