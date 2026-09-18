@@ -93,6 +93,19 @@ struct TrimEditorView: View {
             Text("원본 파일은 변경하거나 삭제하지 않습니다.")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.48))
+
+            if AdvancedVideoTrimService.prefersFFmpeg(for: player.currentMediaURL) {
+                Label(
+                    AdvancedVideoTrimService.isAvailable
+                    ? "FFmpegKitNext 빠른 자르기 사용 가능"
+                    : "MKV 등 고급 자르기는 Mac/Xcode에서 FFmpegKitNext 연결 후 활성화",
+                    systemImage: AdvancedVideoTrimService.isAvailable
+                    ? "checkmark.circle"
+                    : "hammer"
+                )
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.58))
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -200,7 +213,7 @@ struct TrimEditorView: View {
             .buttonStyle(.borderedProminent)
             .disabled(isExporting || selectedDuration < minimumClipLength)
 
-            Text("완료되면 iOS 공유 화면에서 ‘파일에 저장’을 선택하면 됩니다. 현재 1차 빠른 자르기는 AVFoundation이 처리할 수 있는 형식/코덱에서 동작하며, MKV 등 일부 파일은 추후 FFmpeg 계열 편집 엔진 단계에서 확장합니다. 외부 SRT 자막은 새 영상에 포함하지 않습니다.")
+            Text("완료되면 iOS 공유 화면에서 ‘파일에 저장’을 선택하면 됩니다. MP4/MOV 계열은 AVFoundation을 우선 사용하고, FFmpegKitNext가 연결된 빌드에서는 MKV/AVI/TS/WebM/FLV 등도 스트림 복사 방식의 빠른 자르기를 사용합니다. 외부 SRT 자막은 새 영상에 포함하지 않습니다.")
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.46))
                 .fixedSize(horizontal: false, vertical: true)
@@ -305,7 +318,7 @@ struct TrimEditorView: View {
 
         Task {
             do {
-                let url = try await VideoTrimService.export(
+                let url = try await VideoTrimCoordinator.export(
                     sourceURL: sourceURL,
                     startSeconds: startSeconds,
                     endSeconds: endSeconds
