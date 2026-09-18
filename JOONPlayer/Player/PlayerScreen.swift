@@ -23,6 +23,12 @@ struct PlayerScreen: View {
     @State private var horizontalSeekDeltaSeconds: Double = 0
     @State private var horizontalSeekFeedbackTask: Task<Void, Never>?
 
+    @State private var temporarySpeedActivationTask: Task<Void, Never>?
+    @State private var isTemporarySpeedPressTracking = false
+    @State private var temporarySpeedPressCancelled = false
+    @State private var temporarySpeedPreviousRate: Float?
+    @State private var isTemporaryDoubleSpeed = false
+
     @State private var autoHideTask: Task<Void, Never>?
 
     var body: some View {
@@ -49,6 +55,12 @@ struct PlayerScreen: View {
                 .transition(.opacity.combined(with: .scale))
             }
 
+            if isTemporaryDoubleSpeed {
+                temporarySpeedOverlay
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale))
+            }
+
             if isControlsLocked {
                 lockedOverlay
                     .transition(.opacity)
@@ -73,7 +85,11 @@ struct PlayerScreen: View {
         .onAppear {
             scheduleAutoHideIfNeeded()
         }
-        .onChange(of: player.isPlaying) {
+        .onChange(of: player.isPlaying) { _, isPlaying in
+            if !isPlaying {
+                endTemporaryDoubleSpeed()
+            }
+
             scheduleAutoHideIfNeeded()
         }
         .onChange(of: isLandscape) {
@@ -97,6 +113,7 @@ struct PlayerScreen: View {
         .onDisappear {
             seekFeedbackTask?.cancel()
             horizontalSeekFeedbackTask?.cancel()
+            endTemporaryDoubleSpeed()
             autoHideTask?.cancel()
         }
     }
@@ -108,6 +125,7 @@ struct PlayerScreen: View {
         }
         .contentShape(Rectangle())
         .simultaneousGesture(horizontalSeekDragGesture)
+        .simultaneousGesture(temporarySpeedPressGesture)
         .ignoresSafeArea()
     }
 
@@ -122,6 +140,18 @@ struct PlayerScreen: View {
                 handleHorizontalSeekEnded(
                     translation: value.translation
                 )
+            }
+    }
+
+    private var temporarySpeedPressGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                handleTemporarySpeedPressChanged(
+                    translation: value.translation
+                )
+            }
+            .onEnded { _ in
+                endTemporaryDoubleSpeed()
             }
     }
 
@@ -216,6 +246,30 @@ struct PlayerScreen: View {
                 style: .continuous
             )
         )
+    }
+
+    private var temporarySpeedOverlay: some View {
+        VStack {
+            HStack(spacing: 8) {
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 14, weight: .bold))
+
+                Text("2×")
+                    .font(.headline.weight(.bold))
+
+                Text("길게 누르는 동안")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            .clipShape(Capsule())
+
+            Spacer()
+        }
+        .padding(.top, isLandscape ? 18 : 56)
     }
 
     private var overlay: some View {
@@ -376,6 +430,99 @@ struct PlayerScreen: View {
         }
     }
 
+    private func handleTemporarySpeedPressChanged(
+        translation: CGSize
+    ) {
+        guard !isControlsLocked else {
+            endTemporaryDoubleSpeed()
+            return
+        }
+
+        guard player.hasMedia, player.isPlaying else {
+            endTemporaryDoubleSpeed()
+            return
+        }
+
+        let distance = hypot(
+            translation.width,
+            translation.height
+        )
+
+        if distance > 18 {
+            temporarySpeedPressCancelled = true
+            temporarySpeedActivationTask?.cancel()
+            temporarySpeedActivationTask = nil
+
+            if isTemporaryDoubleSpeed {
+                endTemporaryDoubleSpeed()
+            }
+
+            return
+        }
+
+        guard !isTemporarySpeedPressTracking else {
+            return
+        }
+
+        isTemporarySpeedPressTracking = true
+        temporarySpeedPressCancelled = false
+
+        temporarySpeedActivationTask?.cancel()
+        temporarySpeedActivationTask = Task {
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard
+                    isTemporarySpeedPressTracking,
+                    !temporarySpeedPressCancelled,
+                    !isControlsLocked,
+                    player.isPlaying
+                else {
+                    return
+                }
+
+                beginTemporaryDoubleSpeed()
+            }
+        }
+    }
+
+    private func beginTemporaryDoubleSpeed() {
+        guard !isTemporaryDoubleSpeed else { return }
+
+        temporarySpeedPreviousRate = player.playbackRate
+        isTemporaryDoubleSpeed = true
+
+        seekFeedbackTask?.cancel()
+        seekGestureFeedback = nil
+
+        horizontalSeekFeedbackTask?.cancel()
+        horizontalSeekStartSeconds = nil
+        horizontalSeekTargetSeconds = nil
+        horizontalSeekDeltaSeconds = 0
+
+        player.setPlaybackRate(2.0)
+        autoHideTask?.cancel()
+    }
+
+    private func endTemporaryDoubleSpeed() {
+        temporarySpeedActivationTask?.cancel()
+        temporarySpeedActivationTask = nil
+
+        isTemporarySpeedPressTracking = false
+        temporarySpeedPressCancelled = false
+
+        if isTemporaryDoubleSpeed {
+            if let previousRate = temporarySpeedPreviousRate {
+                player.setPlaybackRate(previousRate)
+            }
+
+            isTemporaryDoubleSpeed = false
+        }
+
+        temporarySpeedPreviousRate = nil
+    }
+
     private func handleHorizontalSeekChanged(
         translation: CGSize
     ) {
@@ -390,6 +537,7 @@ struct PlayerScreen: View {
         }
 
         if horizontalSeekStartSeconds == nil {
+            endTemporaryDoubleSpeed()
             horizontalSeekStartSeconds = player.currentSeconds
             seekGestureFeedback = nil
             seekFeedbackTask?.cancel()
@@ -452,6 +600,7 @@ struct PlayerScreen: View {
 
     private func handleSingleTap() {
         guard !isControlsLocked else { return }
+        guard !isTemporaryDoubleSpeed else { return }
         toggleControls()
     }
 
@@ -459,6 +608,8 @@ struct PlayerScreen: View {
         _ direction: SeekGestureFeedback
     ) {
         guard !isControlsLocked else { return }
+
+        endTemporaryDoubleSpeed()
 
         switch direction {
         case .backward:
@@ -520,6 +671,7 @@ struct PlayerScreen: View {
         horizontalSeekFeedbackTask?.cancel()
         seekGestureFeedback = nil
         clearHorizontalSeekFeedback()
+        endTemporaryDoubleSpeed()
         autoHideTask?.cancel()
     }
 
