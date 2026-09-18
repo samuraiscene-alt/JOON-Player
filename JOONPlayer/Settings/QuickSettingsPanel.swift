@@ -1,5 +1,12 @@
 import SwiftUI
 
+private enum QuickSettingsGroup {
+    case playback
+    case audio
+    case subtitles
+    case other
+}
+
 struct QuickSettingsPanel: View {
     @ObservedObject var player: PlayerViewModel
     let onChooseAnotherVideo: () -> Void
@@ -8,142 +15,268 @@ struct QuickSettingsPanel: View {
     let onShowMediaInfo: () -> Void
     let onCaptureSnapshot: () -> Void
 
+    @State private var expandedGroup: QuickSettingsGroup? = .playback
+
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("빠른 설정")
                     .font(.headline)
                     .foregroundStyle(.white)
+                    .padding(.bottom, 2)
 
-                playbackRateSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                frameStepSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                bookmarkSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                abRepeatSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                sleepTimerSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                videoDisplaySection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                mediaTrackSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                audioSyncSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                audioOutputSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                equalizerSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                chapterSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                subtitleSection
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                pictureInPictureRow
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                repairRow
-
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                Button(action: onShowMediaInfo) {
-                    HStack {
-                        Label(
-                            "재생 정보",
-                            systemImage: "info.circle"
-                        )
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.42))
-                    }
-                    .font(.subheadline)
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
+                settingsGroup(
+                    .playback,
+                    title: "재생",
+                    systemImage: "play.rectangle",
+                    summary: playbackGroupSummary
+                ) {
+                    playbackGroupContent
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
 
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                Button(action: onCaptureSnapshot) {
-                    Label(
-                        "현재 장면 스크린샷",
-                        systemImage: "camera"
-                    )
-                    .frame(
-                        maxWidth: .infinity,
-                        alignment: .leading
-                    )
+                settingsGroup(
+                    .audio,
+                    title: "오디오",
+                    systemImage: "speaker.wave.2",
+                    summary: audioGroupSummary
+                ) {
+                    audioGroupContent
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
 
-                Divider()
-                    .overlay(.white.opacity(0.12))
-
-                Button(action: onChooseAnotherVideo) {
-                    Label("다른 동영상 열기", systemImage: "folder")
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                settingsGroup(
+                    .subtitles,
+                    title: "자막",
+                    systemImage: "captions.bubble",
+                    summary: subtitleGroupSummary
+                ) {
+                    subtitleGroupContent
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
+
+                settingsGroup(
+                    .other,
+                    title: "기타",
+                    systemImage: "ellipsis.circle",
+                    summary: nil
+                ) {
+                    otherGroupContent
+                }
             }
-            .padding(16)
+            .padding(14)
         }
-        .frame(maxWidth: 330, maxHeight: 520)
+        .frame(maxWidth: 340, maxHeight: 520)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 22,
+                style: .continuous
+            )
+        )
         .onAppear {
             player.refreshAvailableTracks()
             player.refreshAvailableChapters()
         }
+    }
+
+    private var playbackGroupSummary: String {
+        "\(rateLabel(player.playbackRate)) · "
+        + player.videoDisplayMode.title
+    }
+
+    private var audioGroupSummary: String {
+        player.selectedAudioTrackName
+        + " · "
+        + player.audioOutputMode.title
+    }
+
+    private var subtitleGroupSummary: String {
+        if player.subtitleName != nil {
+            return "외부 SRT"
+        }
+
+        return player.selectedTextTrackName
+    }
+
+    @ViewBuilder
+    private func settingsGroup<Content: View>(
+        _ group: QuickSettingsGroup,
+        title: String,
+        systemImage: String,
+        summary: String?,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        let isExpanded = expandedGroup == group
+
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    expandedGroup = isExpanded
+                        ? nil
+                        : group
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: systemImage)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 22)
+
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+
+                    Spacer(minLength: 8)
+
+                    if let summary {
+                        Text(summary)
+                            .font(.caption2)
+                            .foregroundStyle(.white.opacity(0.48))
+                            .lineLimit(1)
+                    }
+
+                    Image(
+                        systemName: isExpanded
+                            ? "chevron.up"
+                            : "chevron.down"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.48))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Divider()
+                    .overlay(.white.opacity(0.1))
+
+                content()
+                    .padding(.horizontal, 12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 13)
+                    .transition(.opacity)
+            }
+        }
+        .background(.white.opacity(0.055))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 16,
+                style: .continuous
+            )
+        )
+    }
+
+    private var playbackGroupContent: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            playbackRateSection
+            groupDivider
+            frameStepSection
+            groupDivider
+            bookmarkSection
+            groupDivider
+            abRepeatSection
+            groupDivider
+            sleepTimerSection
+            groupDivider
+            chapterSection
+            groupDivider
+            videoDisplaySection
+        }
+    }
+
+    private var audioGroupContent: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            audioTrackSection
+            groupDivider
+            audioSyncSection
+            groupDivider
+            audioOutputSection
+            groupDivider
+            equalizerSection
+        }
+    }
+
+    private var subtitleGroupContent: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            textTrackSection
+            groupDivider
+            subtitleSection
+        }
+    }
+
+    private var otherGroupContent: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            pictureInPictureRow
+            groupDivider
+            repairRow
+            groupDivider
+            mediaInfoRow
+            groupDivider
+            snapshotRow
+            groupDivider
+            chooseVideoRow
+        }
+    }
+
+    private var groupDivider: some View {
+        Divider()
+            .overlay(.white.opacity(0.1))
+    }
+
+    private var mediaInfoRow: some View {
+        Button(action: onShowMediaInfo) {
+            HStack {
+                Label(
+                    "재생 정보",
+                    systemImage: "info.circle"
+                )
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.42))
+            }
+            .font(.subheadline)
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+    }
+
+    private var snapshotRow: some View {
+        Button(action: onCaptureSnapshot) {
+            Label(
+                "현재 장면 스크린샷",
+                systemImage: "camera"
+            )
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+    }
+
+    private var chooseVideoRow: some View {
+        Button(action: onChooseAnotherVideo) {
+            Label(
+                "다른 동영상 열기",
+                systemImage: "folder"
+            )
+            .frame(
+                maxWidth: .infinity,
+                alignment: .leading
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
     }
 
     private var playbackRateSection: some View {
@@ -554,11 +687,14 @@ struct QuickSettingsPanel: View {
         }
     }
 
-    private var mediaTrackSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("오디오 / 자막 트랙", systemImage: "waveform.badge.magnifyingglass")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.78))
+    private var audioTrackSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(
+                "오디오 트랙",
+                systemImage: "waveform.badge.magnifyingglass"
+            )
+            .font(.subheadline)
+            .foregroundStyle(.white.opacity(0.78))
 
             HStack(spacing: 8) {
                 Image(systemName: "speaker.wave.2")
@@ -566,7 +702,7 @@ struct QuickSettingsPanel: View {
                     .foregroundStyle(.white.opacity(0.58))
                     .frame(width: 24)
 
-                Text("오디오")
+                Text("현재 트랙")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.58))
 
@@ -576,11 +712,14 @@ struct QuickSettingsPanel: View {
                     Menu {
                         ForEach(player.audioTrackOptions) { track in
                             Button {
-                                player.selectAudioTrack(id: track.id)
+                                player.selectAudioTrack(
+                                    id: track.id
+                                )
                             } label: {
                                 Label(
                                     track.name,
-                                    systemImage: track.isSelected
+                                    systemImage:
+                                        track.isSelected
                                         ? "checkmark"
                                         : "circle"
                                 )
@@ -588,7 +727,8 @@ struct QuickSettingsPanel: View {
                         }
                     } label: {
                         trackMenuLabel(
-                            title: player.selectedAudioTrackName
+                            title:
+                                player.selectedAudioTrackName
                         )
                     }
                 } else {
@@ -599,81 +739,85 @@ struct QuickSettingsPanel: View {
                 }
             }
 
-            HStack(spacing: 8) {
-                Image(systemName: "captions.bubble")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.58))
-                    .frame(width: 24)
-
-                Text("자막 트랙")
-                    .font(.caption)
-                    .foregroundStyle(.white.opacity(0.58))
-
-                Spacer()
-
-                Menu {
-                    Button {
-                        player.selectTextTrack(id: nil)
-                    } label: {
-                        Label(
-                            "끔",
-                            systemImage: player.textTrackOptions.contains(
-                                where: { $0.isSelected }
-                            )
-                            ? "circle"
-                            : "checkmark"
-                        )
-                    }
-
-                    ForEach(player.textTrackOptions) { track in
-                        Button {
-                            player.selectTextTrack(id: track.id)
-                        } label: {
-                            Label(
-                                track.name,
-                                systemImage: track.isSelected
-                                    ? "checkmark"
-                                    : "circle"
-                            )
-                        }
-                    }
-                } label: {
-                    trackMenuLabel(
-                        title: player.selectedTextTrackName
-                    )
-                }
-                .disabled(player.textTrackOptions.isEmpty)
-                .opacity(player.textTrackOptions.isEmpty ? 0.45 : 1)
-            }
-
-            if
-                player.audioTrackOptions.isEmpty,
-                player.textTrackOptions.isEmpty
-            {
-                Text("현재 파일에서 선택 가능한 추가 트랙을 찾지 못했습니다.")
+            if player.audioTrackOptions.isEmpty {
+                Text("현재 파일에서 오디오 트랙 정보를 찾지 못했습니다.")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.42))
-                    .fixedSize(horizontal: false, vertical: true)
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
             }
         }
     }
 
-    private func trackMenuLabel(
-        title: String
-    ) -> some View {
-        HStack(spacing: 5) {
-            Text(title)
-                .font(.caption.weight(.medium))
-                .lineLimit(1)
+    private var textTrackSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(
+                "내장 자막 트랙",
+                systemImage: "captions.bubble"
+            )
+            .font(.subheadline)
+            .foregroundStyle(.white.opacity(0.78))
 
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.system(size: 9, weight: .semibold))
+            if player.textTrackOptions.isEmpty {
+                Text("현재 영상에는 선택 가능한 내장 자막 트랙이 없습니다.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.42))
+                    .fixedSize(
+                        horizontal: false,
+                        vertical: true
+                    )
+            } else {
+                HStack(spacing: 8) {
+                    Text("현재 자막")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.58))
+
+                    Spacer()
+
+                    Menu {
+                        Button {
+                            player.selectTextTrack(id: nil)
+                        } label: {
+                            Label(
+                                "끔",
+                                systemImage:
+                                    player.textTrackOptions
+                                        .contains(
+                                            where: {
+                                                $0.isSelected
+                                            }
+                                        )
+                                    ? "circle"
+                                    : "checkmark"
+                            )
+                        }
+
+                        ForEach(player.textTrackOptions) { track in
+                            Button {
+                                player.selectTextTrack(
+                                    id: track.id
+                                )
+                            } label: {
+                                Label(
+                                    track.name,
+                                    systemImage:
+                                        track.isSelected
+                                        ? "checkmark"
+                                        : "circle"
+                                )
+                            }
+                        }
+                    } label: {
+                        trackMenuLabel(
+                            title:
+                                player.selectedTextTrackName
+                        )
+                    }
+                }
+            }
         }
-        .foregroundStyle(.white)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 6)
-        .background(.white.opacity(0.1))
-        .clipShape(Capsule())
     }
 
     private var audioSyncSection: some View {
