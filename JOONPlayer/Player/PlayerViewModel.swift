@@ -358,7 +358,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         let currentWholeSecond = Int(currentSeconds.rounded(.down))
 
         guard currentWholeSecond >= 10 else { return }
-        guard currentWholeSecond - lastSavedResumeSecond >= 5 else { return }
+        guard abs(currentWholeSecond - lastSavedResumeSecond) >= 5 else { return }
 
         persistPlaybackProgress()
     }
