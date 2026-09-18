@@ -17,6 +17,12 @@ struct PlayerScreen: View {
     @State private var isControlsLocked = false
     @State private var seekGestureFeedback: SeekGestureFeedback?
     @State private var seekFeedbackTask: Task<Void, Never>?
+
+    @State private var horizontalSeekStartSeconds: Double?
+    @State private var horizontalSeekTargetSeconds: Double?
+    @State private var horizontalSeekDeltaSeconds: Double = 0
+    @State private var horizontalSeekFeedbackTask: Task<Void, Never>?
+
     @State private var autoHideTask: Task<Void, Never>?
 
     var body: some View {
@@ -32,6 +38,15 @@ struct PlayerScreen: View {
                 seekFeedbackOverlay(seekGestureFeedback)
                     .allowsHitTesting(false)
                     .transition(.opacity.combined(with: .scale))
+            }
+
+            if let horizontalSeekTargetSeconds {
+                horizontalSeekOverlay(
+                    targetSeconds: horizontalSeekTargetSeconds,
+                    deltaSeconds: horizontalSeekDeltaSeconds
+                )
+                .allowsHitTesting(false)
+                .transition(.opacity.combined(with: .scale))
             }
 
             if isControlsLocked {
@@ -51,6 +66,10 @@ struct PlayerScreen: View {
         .animation(.easeInOut(duration: 0.18), value: controlsVisible)
         .animation(.easeInOut(duration: 0.18), value: isControlsLocked)
         .animation(.easeOut(duration: 0.16), value: seekGestureFeedback)
+        .animation(
+            .easeOut(duration: 0.14),
+            value: horizontalSeekTargetSeconds
+        )
         .onAppear {
             scheduleAutoHideIfNeeded()
         }
@@ -77,6 +96,7 @@ struct PlayerScreen: View {
         }
         .onDisappear {
             seekFeedbackTask?.cancel()
+            horizontalSeekFeedbackTask?.cancel()
             autoHideTask?.cancel()
         }
     }
@@ -86,7 +106,23 @@ struct PlayerScreen: View {
             gestureZone(direction: .backward)
             gestureZone(direction: .forward)
         }
+        .contentShape(Rectangle())
+        .simultaneousGesture(horizontalSeekDragGesture)
         .ignoresSafeArea()
+    }
+
+    private var horizontalSeekDragGesture: some Gesture {
+        DragGesture(minimumDistance: 18)
+            .onChanged { value in
+                handleHorizontalSeekChanged(
+                    translation: value.translation
+                )
+            }
+            .onEnded { value in
+                handleHorizontalSeekEnded(
+                    translation: value.translation
+                )
+            }
     }
 
     private func gestureZone(
@@ -133,6 +169,53 @@ struct PlayerScreen: View {
                 Spacer()
             }
         }
+    }
+
+    private func horizontalSeekOverlay(
+        targetSeconds: Double,
+        deltaSeconds: Double
+    ) -> some View {
+        VStack(spacing: 10) {
+            Image(
+                systemName: deltaSeconds < 0
+                    ? "backward.fill"
+                    : "forward.fill"
+            )
+            .font(.system(size: 22, weight: .semibold))
+
+            HStack(spacing: 7) {
+                Text(formatGestureTime(targetSeconds))
+                    .font(.headline.monospacedDigit())
+
+                Text("/")
+                    .foregroundStyle(.white.opacity(0.4))
+
+                Text(formatGestureTime(player.durationSeconds))
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.68))
+            }
+
+            Text(formatSeekDelta(deltaSeconds))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.76))
+
+            ProgressView(
+                value: targetSeconds,
+                total: max(player.durationSeconds, 1)
+            )
+            .tint(.white)
+            .frame(width: 170)
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 16)
+        .background(.ultraThinMaterial)
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: 20,
+                style: .continuous
+            )
+        )
     }
 
     private var overlay: some View {
@@ -293,6 +376,80 @@ struct PlayerScreen: View {
         }
     }
 
+    private func handleHorizontalSeekChanged(
+        translation: CGSize
+    ) {
+        guard !isControlsLocked else { return }
+        guard player.durationSeconds > 0 else { return }
+
+        let horizontal = abs(translation.width)
+        let vertical = abs(translation.height)
+
+        guard horizontal > max(vertical * 1.2, 14) else {
+            return
+        }
+
+        if horizontalSeekStartSeconds == nil {
+            horizontalSeekStartSeconds = player.currentSeconds
+            seekGestureFeedback = nil
+            seekFeedbackTask?.cancel()
+
+            showVolumePopup = false
+            showSettings = false
+            autoHideTask?.cancel()
+        }
+
+        guard let startSeconds = horizontalSeekStartSeconds else {
+            return
+        }
+
+        let sensitivity = 0.12
+        let rawDelta = Double(translation.width) * sensitivity
+
+        let target = min(
+            max(startSeconds + rawDelta, 0),
+            player.durationSeconds
+        )
+
+        horizontalSeekTargetSeconds = target
+        horizontalSeekDeltaSeconds = target - startSeconds
+    }
+
+    private func handleHorizontalSeekEnded(
+        translation: CGSize
+    ) {
+        guard
+            !isControlsLocked,
+            let targetSeconds = horizontalSeekTargetSeconds
+        else {
+            clearHorizontalSeekFeedback()
+            return
+        }
+
+        player.seek(to: targetSeconds)
+        horizontalSeekStartSeconds = nil
+
+        horizontalSeekFeedbackTask?.cancel()
+        horizontalSeekFeedbackTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                horizontalSeekTargetSeconds = nil
+                horizontalSeekDeltaSeconds = 0
+            }
+        }
+
+        scheduleAutoHideIfNeeded()
+    }
+
+    private func clearHorizontalSeekFeedback() {
+        horizontalSeekFeedbackTask?.cancel()
+        horizontalSeekStartSeconds = nil
+        horizontalSeekTargetSeconds = nil
+        horizontalSeekDeltaSeconds = 0
+    }
+
     private func handleSingleTap() {
         guard !isControlsLocked else { return }
         toggleControls()
@@ -318,6 +475,11 @@ struct PlayerScreen: View {
     private func showSeekFeedback(
         _ feedback: SeekGestureFeedback
     ) {
+        horizontalSeekFeedbackTask?.cancel()
+        horizontalSeekStartSeconds = nil
+        horizontalSeekTargetSeconds = nil
+        horizontalSeekDeltaSeconds = 0
+
         seekFeedbackTask?.cancel()
         seekGestureFeedback = feedback
 
@@ -354,6 +516,10 @@ struct PlayerScreen: View {
         showVolumePopup = false
         showSettings = false
         showPlaylist = false
+        seekFeedbackTask?.cancel()
+        horizontalSeekFeedbackTask?.cancel()
+        seekGestureFeedback = nil
+        clearHorizontalSeekFeedback()
         autoHideTask?.cancel()
     }
 
@@ -361,6 +527,44 @@ struct PlayerScreen: View {
         isControlsLocked = false
         controlsVisible = true
         scheduleAutoHideIfNeeded()
+    }
+
+    private func formatGestureTime(
+        _ seconds: Double
+    ) -> String {
+        guard seconds.isFinite, seconds >= 0 else {
+            return "00:00"
+        }
+
+        let total = Int(seconds.rounded(.down))
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let secs = total % 60
+
+        if hours > 0 {
+            return String(
+                format: "%d:%02d:%02d",
+                hours,
+                minutes,
+                secs
+            )
+        }
+
+        return String(
+            format: "%02d:%02d",
+            minutes,
+            secs
+        )
+    }
+
+    private func formatSeekDelta(
+        _ seconds: Double
+    ) -> String {
+        let roundedSeconds = Int(seconds.rounded())
+        return String(
+            format: "%+d초",
+            roundedSeconds
+        )
     }
 
     private func scheduleAutoHideIfNeeded() {
