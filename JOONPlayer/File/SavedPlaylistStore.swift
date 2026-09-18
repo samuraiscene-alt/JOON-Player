@@ -28,6 +28,7 @@ final class SavedPlaylistStore: ObservableObject {
     enum StoreError: LocalizedError {
         case noUsableFiles
         case unavailable
+        case duplicateName
 
         var errorDescription: String? {
             switch self {
@@ -35,6 +36,8 @@ final class SavedPlaylistStore: ObservableObject {
                 return "저장할 수 있는 영상 파일을 찾지 못했습니다."
             case .unavailable:
                 return "이 재생 목록의 파일을 다시 열 수 없습니다. 파일이 이동·삭제됐거나 클라우드/외장 저장장치 연결이 끊겼을 수 있습니다."
+            case .duplicateName:
+                return "같은 이름의 저장된 재생 목록이 이미 있습니다."
             }
         }
     }
@@ -168,9 +171,79 @@ final class SavedPlaylistStore: ObservableObject {
         )
     }
 
-    func remove(_ playlist: Playlist) {
-        playlists.removeAll { $0.id == playlist.id }
+    func playlist(id: UUID) -> Playlist? {
+        playlists.first { $0.id == id }
+    }
+
+    func rename(
+        playlistID: UUID,
+        to newName: String
+    ) throws {
+        guard let index = playlists.firstIndex(
+            where: { $0.id == playlistID }
+        ) else {
+            throw StoreError.unavailable
+        }
+
+        let trimmedName = newName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        let finalName = trimmedName.isEmpty
+            ? "재생 목록"
+            : trimmedName
+
+        let hasDuplicate = playlists.contains {
+            $0.id != playlistID
+            && $0.name.compare(
+                finalName,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) == .orderedSame
+        }
+
+        guard !hasDuplicate else {
+            throw StoreError.duplicateName
+        }
+
+        playlists[index].name = finalName
+        playlists[index].updatedAt = Date()
+        sortTrimAndSave()
+    }
+
+    func removeItem(
+        at itemIndex: Int,
+        from playlistID: UUID
+    ) {
+        guard let playlistIndex = playlists.firstIndex(
+            where: { $0.id == playlistID }
+        ) else {
+            return
+        }
+
+        guard playlists[playlistIndex].items.indices.contains(
+            itemIndex
+        ) else {
+            return
+        }
+
+        playlists[playlistIndex].items.remove(at: itemIndex)
+
+        if playlists[playlistIndex].items.isEmpty {
+            playlists.remove(at: playlistIndex)
+        } else {
+            playlists[playlistIndex].updatedAt = Date()
+        }
+
+        sortTrimAndSave()
+    }
+
+    func remove(playlistID: UUID) {
+        playlists.removeAll { $0.id == playlistID }
         save()
+    }
+
+    func remove(_ playlist: Playlist) {
+        remove(playlistID: playlist.id)
     }
 
     func removeAll() {

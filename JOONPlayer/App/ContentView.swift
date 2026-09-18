@@ -39,18 +39,12 @@ struct ContentView: View {
                     )
                 } else {
                     EmptyPlayerView(
-                        savedPlaylists: savedPlaylistStore.playlists,
+                        savedPlaylistStore: savedPlaylistStore,
                         recentItems: recentStore.items,
                         chooseVideo: {
                             isVideoPickerPresented = true
                         },
                         openSavedPlaylist: openSavedPlaylist,
-                        removeSavedPlaylist: { playlist in
-                            savedPlaylistStore.remove(playlist)
-                        },
-                        clearSavedPlaylists: {
-                            savedPlaylistStore.removeAll()
-                        },
                         openRecent: openRecent,
                         removeRecent: { item in
                             recentStore.remove(item)
@@ -156,17 +150,17 @@ struct ContentView: View {
 }
 
 private struct EmptyPlayerView: View {
-    let savedPlaylists: [SavedPlaylistStore.Playlist]
+    @ObservedObject var savedPlaylistStore: SavedPlaylistStore
     let recentItems: [RecentMediaStore.Item]
     let chooseVideo: () -> Void
 
     let openSavedPlaylist: (SavedPlaylistStore.Playlist) -> Void
-    let removeSavedPlaylist: (SavedPlaylistStore.Playlist) -> Void
-    let clearSavedPlaylists: () -> Void
 
     let openRecent: (RecentMediaStore.Item) -> Void
     let removeRecent: (RecentMediaStore.Item) -> Void
     let clearRecent: () -> Void
+
+    @State private var managingPlaylist: SavedPlaylistStore.Playlist?
 
     var body: some View {
         ScrollView {
@@ -181,7 +175,7 @@ private struct EmptyPlayerView: View {
                 }
                 .buttonStyle(.borderedProminent)
 
-                if !savedPlaylists.isEmpty {
+                if !savedPlaylistStore.playlists.isEmpty {
                     savedPlaylistSection
                 }
 
@@ -193,6 +187,12 @@ private struct EmptyPlayerView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 30)
             .frame(maxWidth: .infinity)
+        }
+        .sheet(item: $managingPlaylist) { playlist in
+            SavedPlaylistManageView(
+                store: savedPlaylistStore,
+                playlistID: playlist.id
+            )
         }
     }
 
@@ -222,7 +222,10 @@ private struct EmptyPlayerView: View {
 
                 Spacer()
 
-                Button("모두 지우기", action: clearSavedPlaylists)
+                Button(
+                    "모두 지우기",
+                    action: savedPlaylistStore.removeAll
+                )
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.58))
                     .buttonStyle(.plain)
@@ -230,7 +233,7 @@ private struct EmptyPlayerView: View {
 
             VStack(spacing: 0) {
                 ForEach(
-                    Array(savedPlaylists.enumerated()),
+                    Array(savedPlaylistStore.playlists.enumerated()),
                     id: \.element.id
                 ) { index, playlist in
                     HStack(spacing: 12) {
@@ -274,20 +277,20 @@ private struct EmptyPlayerView: View {
                         .buttonStyle(.plain)
 
                         Button {
-                            removeSavedPlaylist(playlist)
+                            managingPlaylist = playlist
                         } label: {
-                            Image(systemName: "trash")
-                                .font(.system(size: 15))
-                                .foregroundStyle(.white.opacity(0.48))
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.58))
                                 .frame(width: 36, height: 36)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("저장된 재생 목록 삭제")
+                        .accessibilityLabel("저장된 재생 목록 관리")
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
 
-                    if index < savedPlaylists.count - 1 {
+                    if index < savedPlaylistStore.playlists.count - 1 {
                         Divider()
                             .overlay(.white.opacity(0.08))
                             .padding(.leading, 54)
