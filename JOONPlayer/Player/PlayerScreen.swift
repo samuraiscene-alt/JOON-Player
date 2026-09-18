@@ -1246,7 +1246,7 @@ struct PlayerScreen: View {
             return player.canAddPlaybackBookmark
 
         case .snapshot:
-            return player.canStepFrames
+            return player.canCaptureSnapshot
                 && !isCapturingSnapshot
 
         case .previousFrame, .nextFrame:

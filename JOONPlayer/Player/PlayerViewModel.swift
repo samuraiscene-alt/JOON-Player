@@ -1182,13 +1182,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func captureCurrentFrameSnapshot() async throws -> URL {
-        guard
-            hasMedia,
-            !isLoading,
-            !mediaPlayer.videoTracks.isEmpty,
-            mediaPlayer.state == .playing
-                || mediaPlayer.state == .paused
-        else {
+        guard canCaptureSnapshot else {
             throw VideoSnapshotError.noVideoOutput
         }
 
@@ -1240,9 +1234,29 @@ final class PlayerViewModel: NSObject, ObservableObject {
     func mediaInfoSnapshot() -> MediaInfoSnapshot {
         let url = securityScopedURL
 
-        let fileSize = try? url?.resourceValues(
-            forKeys: [.fileSizeKey]
-        ).fileSize
+        let formatName: String = {
+            guard
+                let extensionName = url?.pathExtension,
+                !extensionName.isEmpty
+            else {
+                return "알 수 없음"
+            }
+
+            return extensionName.uppercased()
+        }()
+
+        let fileSize: Int? = {
+            guard
+                let url,
+                let values = try? url.resourceValues(
+                    forKeys: [.fileSizeKey]
+                )
+            else {
+                return nil
+            }
+
+            return values.fileSize
+        }()
 
         let fileFields: [MediaInfoField] = [
             MediaInfoField(
@@ -1251,13 +1265,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
             ),
             MediaInfoField(
                 "형식",
-                url?.pathExtension.uppercased().isEmpty == false
-                    ? url!.pathExtension.uppercased()
-                    : "알 수 없음"
+                formatName
             ),
             MediaInfoField(
                 "파일 크기",
-                fileSize.flatMap { $0 }.map {
+                fileSize.map {
                     ByteCountFormatter.string(
                         fromByteCount: Int64($0),
                         countStyle: .file
@@ -1574,17 +1586,35 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func playPreviousChapter() {
-        guard canPlayPreviousChapter else { return }
+        guard
+            canPlayPreviousChapter,
+            let currentChapterOptionIndex
+        else {
+            return
+        }
 
-        mediaPlayer.previousChapter()
-        refreshAvailableChapters()
+        let previousChapter =
+            chapterOptions[
+                currentChapterOptionIndex - 1
+            ]
+
+        selectChapter(index: previousChapter.id)
     }
 
     func playNextChapter() {
-        guard canPlayNextChapter else { return }
+        guard
+            canPlayNextChapter,
+            let currentChapterOptionIndex
+        else {
+            return
+        }
 
-        mediaPlayer.nextChapter()
-        refreshAvailableChapters()
+        let nextChapter =
+            chapterOptions[
+                currentChapterOptionIndex + 1
+            ]
+
+        selectChapter(index: nextChapter.id)
     }
 
     func loadSubtitle(url: URL) {
@@ -1670,7 +1700,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         securityScopedURL
     }
 
-    var canStepFrames: Bool {
+    private var hasReadyVideoOutput: Bool {
         guard
             hasMedia,
             !isLoading,
@@ -1681,6 +1711,14 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         return mediaPlayer.state == .playing
             || mediaPlayer.state == .paused
+    }
+
+    var canStepFrames: Bool {
+        hasReadyVideoOutput
+    }
+
+    var canCaptureSnapshot: Bool {
+        hasReadyVideoOutput
     }
 
     var audioEqualizerPresetOptions: [AudioEqualizerPresetOption] {
@@ -1753,28 +1791,57 @@ final class PlayerViewModel: NSObject, ObservableObject {
             ?? "끔"
     }
 
+    private var currentChapterOptionIndex: Int? {
+        if let currentIndex = chapterOptions.firstIndex(
+            where: { $0.isCurrent }
+        ) {
+            return currentIndex
+        }
+
+        let currentChapterID =
+            Int(mediaPlayer.currentChapterIndex)
+
+        return chapterOptions.firstIndex(
+            where: { $0.id == currentChapterID }
+        )
+    }
+
     var currentChapterName: String {
-        chapterOptions.first(where: { $0.isCurrent })?.name
-            ?? chapterOptions.first(
-                where: {
-                    $0.id == Int(mediaPlayer.currentChapterIndex)
-                }
-            )?.name
-            ?? "챕터"
+        guard
+            let currentChapterOptionIndex,
+            chapterOptions.indices.contains(
+                currentChapterOptionIndex
+            )
+        else {
+            return "챕터"
+        }
+
+        return chapterOptions[
+            currentChapterOptionIndex
+        ].name
     }
 
     var canPlayPreviousChapter: Bool {
-        guard chapterOptions.count > 1 else { return false }
+        guard
+            chapterOptions.count > 1,
+            let currentChapterOptionIndex
+        else {
+            return false
+        }
 
-        return Int(mediaPlayer.currentChapterIndex) > 0
+        return currentChapterOptionIndex > 0
     }
 
     var canPlayNextChapter: Bool {
-        guard chapterOptions.count > 1 else { return false }
+        guard
+            chapterOptions.count > 1,
+            let currentChapterOptionIndex
+        else {
+            return false
+        }
 
-        let currentIndex = Int(mediaPlayer.currentChapterIndex)
-        return currentIndex >= 0
-            && currentIndex < chapterOptions.count - 1
+        return currentChapterOptionIndex
+            < chapterOptions.count - 1
     }
 
     var playlistCount: Int {
