@@ -19,7 +19,7 @@ FFmpegKitNext는 기존 프로젝트의 원 저자가 이어서 유지하는 후
 `FFmpegKitNextRuntime`은 `#if canImport(ffmpegkit)`로 동작한다.
 
 따라서 지금 저장소는 FFmpegKitNext 바이너리가 없어도 나머지 코드 구조를 유지하고,
-나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 고급 자르기와 복구/리먹스 경로가 자동으로 활성화된다.
+나중에 Mac/Xcode에서 `ffmpegkit` 모듈을 연결하면 고급 자르기, 정확 자르기, 복구/리먹스 경로가 자동으로 활성화된다.
 
 모든 FFmpeg 명령은 하나의 전용 serial queue를 공유한다.
 FFmpeg fftools의 process-global 상태 때문에 자르기, 복구, 향후 썸네일/변환 작업을 동시에 실행하지 않도록 하기 위한 구조다.
@@ -43,7 +43,7 @@ git checkout v9.0.0
 
 FFmpegKitNext 공식 Apple 문서는 Xcode 26.0+와 Command Line Tools를 요구한다.
 
-## 고급 빠른 자르기
+## 빠른 자르기
 
 재인코딩 없이 스트림을 복사한다.
 
@@ -69,7 +69,35 @@ FFmpegKitNext 공식 Apple 문서는 Xcode 26.0+와 Command Line Tools를 요구
 를 사용한다.
 
 이 방식은 빠르고 원본 화질을 다시 압축하지 않지만, 코덱의 키프레임 위치 때문에 시작점이 프레임 단위로 완전히 정확하지 않을 수 있다.
-정확한 프레임 컷은 이후 선택형 재인코딩 경로로 분리한다.
+
+## 정확 자르기
+
+사용자가 **정확 자르기**를 선택하면 빠른 자르기와 분리된 재인코딩 경로를 사용한다.
+
+- MP4 / MOV / M4V: AVFoundation의 `AVAssetExportPresetHighestQuality` + 정확한 `timeRange`를 우선 사용한다.
+- MKV / AVI / TS / M2TS / WebM / FLV 등: FFmpegKitNext가 연결되어 있을 때 FFmpeg 재인코딩 경로를 사용한다.
+- FFmpeg 경로에서는 입력을 연 뒤 `-ss`를 적용해 목표 시점까지 디코딩하므로 키프레임 기반 스트림 복사보다 정확한 컷을 만든다.
+- 출력은 MP4, 영상은 FFmpeg 내장 `mpeg4` 인코더, 오디오는 `aac`를 사용한다.
+- 이 방식은 재인코딩이므로 처리 시간이 길어지고 파일 크기나 화질이 달라질 수 있다.
+- 외부 SRT는 포함하지 않는다.
+
+FFmpeg 정확 자르기 명령의 핵심 구조:
+
+```
+-i <input>
+-ss <start>
+-t <duration>
+-map 0:v:0?
+-map 0:a:0?
+-c:v mpeg4
+-q:v 2
+-c:a aac
+-b:a 192k
+-movflags +faststart
+<output.mp4>
+```
+
+실제 컷 위치는 임의의 소수점 시간이 아니라 소스 영상의 가장 가까운 프레임 경계에 맞춰진다.
 
 ## 빠른 복구 / 리먹스
 

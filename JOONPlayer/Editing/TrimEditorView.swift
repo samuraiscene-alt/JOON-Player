@@ -6,6 +6,7 @@ struct TrimEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var player: PlayerViewModel
 
+    @State private var trimMode: TrimExportMode = .fast
     @State private var startSeconds: Double = 0
     @State private var endSeconds: Double = 1
     @State private var didInitializeRange = false
@@ -22,6 +23,7 @@ struct TrimEditorView: View {
             ScrollView {
                 VStack(spacing: 20) {
                     sourceSection
+                    exportModeSection
                     rangeSection
                     previewSection
                     exportSection
@@ -108,6 +110,38 @@ struct TrimEditorView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var exportModeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("자르기 방식", systemImage: "slider.horizontal.3")
+                .font(.headline)
+
+            Picker("자르기 방식", selection: $trimMode) {
+                ForEach(TrimExportMode.allCases) { mode in
+                    Text(mode.title)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Text(trimMode.explanation)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.55))
+                .fixedSize(horizontal: false, vertical: true)
+
+            if trimMode == .precise, !preciseModeAvailable {
+                Label(
+                    "이 파일의 정확 자르기는 FFmpegKitNext 연결 후 사용할 수 있습니다.",
+                    systemImage: "hammer"
+                )
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.62))
+            }
+        }
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private var rangeSection: some View {
@@ -201,19 +235,27 @@ struct TrimEditorView: View {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(
+                            systemName: trimMode == .fast
+                            ? "bolt.fill"
+                            : "scope"
+                        )
                     }
 
-                    Text(isExporting ? "새 파일 만드는 중…" : "새 파일로 저장")
+                    Text(exportButtonTitle)
                         .font(.headline)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(isExporting || selectedDuration < minimumClipLength)
+            .disabled(
+                isExporting
+                || selectedDuration < minimumClipLength
+                || (trimMode == .precise && !preciseModeAvailable)
+            )
 
-            Text("완료되면 iOS 공유 화면에서 ‘파일에 저장’을 선택하면 됩니다. MP4/MOV 계열은 AVFoundation을 우선 사용하고, FFmpegKitNext가 연결된 빌드에서는 MKV/AVI/TS/WebM/FLV 등도 스트림 복사 방식의 빠른 자르기를 사용합니다. 외부 SRT 자막은 새 영상에 포함하지 않습니다.")
+            Text(exportFootnote)
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.46))
                 .fixedSize(horizontal: false, vertical: true)
@@ -233,6 +275,33 @@ struct TrimEditorView: View {
 
             Slider(value: value, in: range)
                 .tint(.white)
+        }
+    }
+
+    private var preciseModeAvailable: Bool {
+        PreciseVideoTrimService.isAvailable(
+            for: player.currentMediaURL
+        )
+    }
+
+    private var exportButtonTitle: String {
+        if isExporting {
+            return trimMode == .fast
+                ? "빠른 파일 만드는 중…"
+                : "정확 자르기 처리 중…"
+        }
+
+        return trimMode == .fast
+            ? "빠르게 새 파일로 저장"
+            : "정확하게 새 파일로 저장"
+    }
+
+    private var exportFootnote: String {
+        switch trimMode {
+        case .fast:
+            return "빠른 자르기는 재인코딩을 피해서 속도와 원본 화질 보존을 우선합니다. 키프레임 때문에 시작점이 약간 앞뒤로 달라질 수 있습니다. 외부 SRT 자막은 포함하지 않습니다."
+        case .precise:
+            return "정확 자르기는 선택 지점까지 디코딩한 뒤 영상을 다시 인코딩해 프레임 경계 기준으로 자릅니다. 처리 시간이 길고 영상이 다시 압축될 수 있습니다. 외부 SRT 자막은 포함하지 않습니다."
         }
     }
 
@@ -308,6 +377,11 @@ struct TrimEditorView: View {
             return
         }
 
+        if trimMode == .precise, !preciseModeAvailable {
+            errorMessage = "이 파일의 정확 자르기는 FFmpegKitNext 연결 후 사용할 수 있습니다."
+            return
+        }
+
         stopPreviewIfNeeded()
 
         if player.isPlaying {
@@ -321,7 +395,8 @@ struct TrimEditorView: View {
                 let url = try await VideoTrimCoordinator.export(
                     sourceURL: sourceURL,
                     startSeconds: startSeconds,
-                    endSeconds: endSeconds
+                    endSeconds: endSeconds,
+                    mode: trimMode
                 )
 
                 await MainActor.run {
@@ -369,7 +444,7 @@ enum VideoTrimService {
             case .invalidRange:
                 return "선택한 자르기 구간이 올바르지 않습니다."
             case .unsupportedSource:
-                return "이 파일은 현재 빠른 자르기 엔진에서 읽을 수 없습니다. MKV 등 일부 형식은 이후 FFmpeg 계열 편집 엔진에서 지원할 예정입니다."
+                return "이 파일은 현재 빠른 자르기 엔진에서 읽을 수 없습니다."
             case .cannotCreateExporter:
                 return "이 영상의 코덱 또는 컨테이너는 현재 빠른 자르기를 지원하지 않습니다."
             case .unsupportedOutput:

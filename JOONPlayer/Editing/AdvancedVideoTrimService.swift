@@ -1,7 +1,55 @@
 import Foundation
 
+enum TrimExportMode: String, CaseIterable, Identifiable {
+    case fast
+    case precise
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fast:
+            return "빠른 자르기"
+        case .precise:
+            return "정확 자르기"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .fast:
+            return "재인코딩을 피해서 빠르고 화질 손실이 없도록 자릅니다."
+        case .precise:
+            return "선택 지점까지 디코딩한 뒤 다시 인코딩해 키프레임 제약을 없앱니다."
+        }
+    }
+}
+
 enum VideoTrimCoordinator {
     static func export(
+        sourceURL: URL,
+        startSeconds: Double,
+        endSeconds: Double,
+        mode: TrimExportMode
+    ) async throws -> URL {
+        switch mode {
+        case .fast:
+            return try await exportFast(
+                sourceURL: sourceURL,
+                startSeconds: startSeconds,
+                endSeconds: endSeconds
+            )
+
+        case .precise:
+            return try await PreciseVideoTrimService.export(
+                sourceURL: sourceURL,
+                startSeconds: startSeconds,
+                endSeconds: endSeconds
+            )
+        }
+    }
+
+    private static func exportFast(
         sourceURL: URL,
         startSeconds: Double,
         endSeconds: Double
