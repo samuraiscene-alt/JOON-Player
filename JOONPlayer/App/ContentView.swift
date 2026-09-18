@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var player = PlayerViewModel()
     @State private var isVideoPickerPresented = false
     @State private var isSubtitlePickerPresented = false
@@ -61,6 +62,11 @@ struct ContentView: View {
 
             case .failure(let error):
                 player.present(error: "자막 파일을 열 수 없습니다.\n\(error.localizedDescription)")
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase != .active {
+                player.persistPlaybackProgress()
             }
         }
         .alert(

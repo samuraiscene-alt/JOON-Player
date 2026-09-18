@@ -58,6 +58,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private var pictureInPictureController: (any VLCPictureInPictureWindowControlling)?
 
+    private let resumeStore = PlaybackResumeStore.shared
+    private var currentResumeIdentifier: String?
+    private var pendingResumeSeconds: Double?
+    private var lastSavedResumeSecond = -1
+
     override init() {
         super.init()
         mediaPlayer.delegate = self
@@ -113,12 +118,17 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 
     func load(url: URL) {
+        persistPlaybackProgress()
         mediaPlayer.stop()
         releaseSubtitleScope()
         releaseSecurityScope()
 
         securityScopedURL = url
         isUsingSecurityScope = url.startAccessingSecurityScopedResource()
+
+        currentResumeIdentifier = PlaybackResumeStore.identifier(for: url)
+        pendingResumeSeconds = currentResumeIdentifier.flatMap { resumeStore.position(for: $0) }
+        lastSavedResumeSecond = -1
 
         hasMedia = true
         isLoading = true
@@ -233,6 +243,23 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.currentVideoSubTitleDelay = clamped * 1_000
     }
 
+    func persistPlaybackProgress() {
+        guard
+            let currentResumeIdentifier,
+            durationSeconds > 0
+        else {
+            return
+        }
+
+        resumeStore.save(
+            position: currentSeconds,
+            duration: durationSeconds,
+            for: currentResumeIdentifier
+        )
+
+        lastSavedResumeSecond = Int(currentSeconds.rounded(.down))
+    }
+
     func present(error: String) {
         errorMessage = error
     }
@@ -297,6 +324,43 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private func invalidatePictureInPicturePlaybackState() {
         pictureInPictureController?.invalidatePlaybackState()
+    }
+
+    private func applyPendingResumeIfPossible() {
+        guard
+            let pendingResumeSeconds,
+            durationSeconds > 0
+        else {
+            return
+        }
+
+        self.pendingResumeSeconds = nil
+
+        guard pendingResumeSeconds >= 10 else {
+            return
+        }
+
+        let lastUsefulPosition = max(durationSeconds - 30, 0)
+
+        guard pendingResumeSeconds < lastUsefulPosition else {
+            if let currentResumeIdentifier {
+                resumeStore.remove(for: currentResumeIdentifier)
+            }
+            return
+        }
+
+        seek(to: pendingResumeSeconds)
+    }
+
+    private func saveResumeProgressIfNeeded() {
+        guard durationSeconds > 0 else { return }
+
+        let currentWholeSecond = Int(currentSeconds.rounded(.down))
+
+        guard currentWholeSecond >= 10 else { return }
+        guard currentWholeSecond - lastSavedResumeSecond >= 5 else { return }
+
+        persistPlaybackProgress()
     }
 
     private static func formatTime(_ seconds: Double) -> String {
@@ -425,12 +489,14 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             isLoading = false
             isPlaying = true
             refreshDuration()
+            applyPendingResumeIfPossible()
             applyVideoDisplayMode()
             attachPendingSubtitleIfPossible()
 
         case .paused:
             isLoading = false
             isPlaying = false
+            persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
 
         case .stopping, .stopped:
@@ -452,6 +518,8 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
     func mediaPlayerTimeChanged(_ aNotification: Notification) {
         refreshTime()
         refreshDuration()
+        applyPendingResumeIfPossible()
+        saveResumeProgressIfNeeded()
     }
 
     func mediaPlayerLengthChanged(_ length: Int64) {
