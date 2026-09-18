@@ -8,40 +8,42 @@ struct QuickSettingsPanel: View {
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("빠른 설정")
-                .font(.headline)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("빠른 설정")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                playbackRateSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                videoDisplaySection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                subtitleSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                pictureInPictureRow
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
+                Button(action: onChooseAnotherVideo) {
+                    Label("다른 동영상 열기", systemImage: "folder")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
                 .foregroundStyle(.white)
-
-            playbackRateSection
-
-            Divider()
-                .overlay(.white.opacity(0.12))
-
-            videoDisplaySection
-
-            Divider()
-                .overlay(.white.opacity(0.12))
-
-            subtitleSection
-
-            Divider()
-                .overlay(.white.opacity(0.12))
-
-            pictureInPictureRow
-
-            Divider()
-                .overlay(.white.opacity(0.12))
-
-            Button(action: onChooseAnotherVideo) {
-                Label("다른 동영상 열기", systemImage: "folder")
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(.white)
+            .padding(16)
         }
-        .padding(16)
-        .frame(maxWidth: 330)
+        .frame(maxWidth: 330, maxHeight: 520)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
@@ -113,7 +115,7 @@ struct QuickSettingsPanel: View {
     }
 
     private var subtitleSection: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Label("외부 자막", systemImage: "captions.bubble")
                     .font(.subheadline)
@@ -150,32 +152,112 @@ struct QuickSettingsPanel: View {
             .foregroundStyle(.white)
 
             if player.subtitleName != nil {
-                HStack(spacing: 8) {
-                    Button {
-                        player.adjustSubtitleDelay(byMilliseconds: -100)
-                    } label: {
-                        Text("-0.1")
-                            .frame(minWidth: 42)
-                    }
+                subtitleDelayControls
+                subtitleSizeControls
+                subtitlePositionControls
+            }
+        }
+    }
 
-                    Button {
-                        player.resetSubtitleDelay()
-                    } label: {
-                        Text(player.formattedSubtitleDelay)
-                            .font(.caption.monospacedDigit())
-                            .frame(minWidth: 62)
-                    }
+    private var subtitleDelayControls: some View {
+        HStack(spacing: 8) {
+            Text("싱크")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.58))
+                .frame(width: 34, alignment: .leading)
 
+            Button {
+                player.adjustSubtitleDelay(byMilliseconds: -100)
+            } label: {
+                Text("-0.1")
+                    .frame(minWidth: 42)
+            }
+
+            Button {
+                player.resetSubtitleDelay()
+            } label: {
+                Text(player.formattedSubtitleDelay)
+                    .font(.caption.monospacedDigit())
+                    .frame(minWidth: 62)
+            }
+
+            Button {
+                player.adjustSubtitleDelay(byMilliseconds: 100)
+            } label: {
+                Text("+0.1")
+                    .frame(minWidth: 42)
+            }
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+        .tint(.white.opacity(0.82))
+    }
+
+    private var subtitleSizeControls: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "textformat.size")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.58))
+                .frame(width: 34)
+
+            Button {
+                player.adjustSubtitleFontScale(by: -0.1)
+            } label: {
+                Image(systemName: "minus")
+                    .frame(minWidth: 42)
+            }
+            .disabled(player.subtitleFontScale <= 0.6)
+
+            Button {
+                player.resetSubtitleFontScale()
+            } label: {
+                Text(player.formattedSubtitleFontScale)
+                    .font(.caption.monospacedDigit())
+                    .frame(minWidth: 62)
+            }
+
+            Button {
+                player.adjustSubtitleFontScale(by: 0.1)
+            } label: {
+                Image(systemName: "plus")
+                    .frame(minWidth: 42)
+            }
+            .disabled(player.subtitleFontScale >= 1.8)
+        }
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.bordered)
+        .tint(.white.opacity(0.82))
+    }
+
+    private var subtitlePositionControls: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Label("자막 위치", systemImage: "arrow.up.and.down")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.58))
+
+            HStack(spacing: 7) {
+                ForEach(SubtitleVerticalPosition.allCases) { position in
                     Button {
-                        player.adjustSubtitleDelay(byMilliseconds: 100)
+                        player.setSubtitleVerticalPosition(position)
                     } label: {
-                        Text("+0.1")
-                            .frame(minWidth: 42)
+                        Text(position.title)
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 7)
+                            .background(
+                                player.subtitleVerticalPosition == position
+                                ? Color.white
+                                : Color.white.opacity(0.1)
+                            )
+                            .foregroundStyle(
+                                player.subtitleVerticalPosition == position
+                                ? Color.black
+                                : Color.white
+                            )
+                            .clipShape(Capsule())
                     }
+                    .buttonStyle(.plain)
                 }
-                .font(.caption.weight(.semibold))
-                .buttonStyle(.bordered)
-                .tint(.white.opacity(0.82))
             }
         }
     }
