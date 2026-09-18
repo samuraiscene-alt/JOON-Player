@@ -6,6 +6,7 @@ struct ContentView: View {
 
     @StateObject private var player = PlayerViewModel()
     @StateObject private var recentStore = RecentMediaStore()
+    @StateObject private var savedPlaylistStore = SavedPlaylistStore()
 
     @State private var isVideoPickerPresented = false
     @State private var isSubtitlePickerPresented = false
@@ -24,6 +25,7 @@ struct ContentView: View {
                 if player.hasMedia {
                     PlayerScreen(
                         player: player,
+                        savedPlaylistStore: savedPlaylistStore,
                         isLandscape: isLandscape,
                         onCloseVideo: {
                             player.closeMedia()
@@ -37,9 +39,17 @@ struct ContentView: View {
                     )
                 } else {
                     EmptyPlayerView(
+                        savedPlaylists: savedPlaylistStore.playlists,
                         recentItems: recentStore.items,
                         chooseVideo: {
                             isVideoPickerPresented = true
+                        },
+                        openSavedPlaylist: openSavedPlaylist,
+                        removeSavedPlaylist: { playlist in
+                            savedPlaylistStore.remove(playlist)
+                        },
+                        clearSavedPlaylists: {
+                            savedPlaylistStore.removeAll()
                         },
                         openRecent: openRecent,
                         removeRecent: { item in
@@ -121,11 +131,39 @@ struct ContentView: View {
             player.present(error: error.localizedDescription)
         }
     }
+
+    private func openSavedPlaylist(
+        _ playlist: SavedPlaylistStore.Playlist
+    ) {
+        do {
+            let resolution = try savedPlaylistStore.resolve(playlist)
+
+            for url in resolution.urls.reversed() {
+                try? recentStore.remember(url: url)
+            }
+
+            player.loadPlaylist(urls: resolution.urls)
+
+            if resolution.unavailableCount > 0 {
+                player.present(
+                    error: "재생 목록에서 열 수 없는 파일 \(resolution.unavailableCount)개를 제외했습니다."
+                )
+            }
+        } catch {
+            player.present(error: error.localizedDescription)
+        }
+    }
 }
 
 private struct EmptyPlayerView: View {
+    let savedPlaylists: [SavedPlaylistStore.Playlist]
     let recentItems: [RecentMediaStore.Item]
     let chooseVideo: () -> Void
+
+    let openSavedPlaylist: (SavedPlaylistStore.Playlist) -> Void
+    let removeSavedPlaylist: (SavedPlaylistStore.Playlist) -> Void
+    let clearSavedPlaylists: () -> Void
+
     let openRecent: (RecentMediaStore.Item) -> Void
     let removeRecent: (RecentMediaStore.Item) -> Void
     let clearRecent: () -> Void
@@ -142,6 +180,10 @@ private struct EmptyPlayerView: View {
                         .padding(.vertical, 12)
                 }
                 .buttonStyle(.borderedProminent)
+
+                if !savedPlaylists.isEmpty {
+                    savedPlaylistSection
+                }
 
                 if !recentItems.isEmpty {
                     recentSection
@@ -164,10 +206,101 @@ private struct EmptyPlayerView: View {
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
 
-            Text("파일 앱에서 한 개 또는 여러 영상을 선택하거나 최근 파일에서 바로 이어서 재생합니다.")
+            Text("여러 영상을 재생 목록으로 만들고 저장해 두었다가 다시 불러올 수 있습니다.")
                 .font(.subheadline)
                 .foregroundStyle(.white.opacity(0.64))
                 .multilineTextAlignment(.center)
+        }
+    }
+
+    private var savedPlaylistSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("저장된 재생 목록", systemImage: "music.note.list")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Button("모두 지우기", action: clearSavedPlaylists)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .buttonStyle(.plain)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(
+                    Array(savedPlaylists.enumerated()),
+                    id: \.element.id
+                ) { index, playlist in
+                    HStack(spacing: 12) {
+                        Button {
+                            openSavedPlaylist(playlist)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "list.bullet.rectangle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(.white.opacity(0.72))
+                                    .frame(width: 28)
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(playlist.name)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+
+                                    Text(
+                                        "\(playlist.items.count)개 · "
+                                        + playlist.updatedAt.formatted(
+                                            .dateTime
+                                                .month()
+                                                .day()
+                                                .hour()
+                                                .minute()
+                                        )
+                                    )
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.46))
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.7))
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            removeSavedPlaylist(playlist)
+                        } label: {
+                            Image(systemName: "trash")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white.opacity(0.48))
+                                .frame(width: 36, height: 36)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("저장된 재생 목록 삭제")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+
+                    if index < savedPlaylists.count - 1 {
+                        Divider()
+                            .overlay(.white.opacity(0.08))
+                            .padding(.leading, 54)
+                    }
+                }
+            }
+            .background(.ultraThinMaterial)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
         }
     }
 

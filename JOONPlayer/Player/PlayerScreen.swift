@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PlayerScreen: View {
     @ObservedObject var player: PlayerViewModel
+    @ObservedObject var savedPlaylistStore: SavedPlaylistStore
     let isLandscape: Bool
     let onCloseVideo: () -> Void
     let onChooseAnotherVideo: () -> Void
@@ -63,7 +64,10 @@ struct PlayerScreen: View {
             VideoRepairView(player: player)
         }
         .sheet(isPresented: $showPlaylist) {
-            PlaybackQueueView(player: player)
+            PlaybackQueueView(
+                player: player,
+                savedPlaylistStore: savedPlaylistStore
+            )
         }
         .onDisappear {
             autoHideTask?.cancel()

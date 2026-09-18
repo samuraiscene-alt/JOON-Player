@@ -3,12 +3,18 @@ import SwiftUI
 struct PlaybackQueueView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var player: PlayerViewModel
+    @ObservedObject var savedPlaylistStore: SavedPlaylistStore
+
+    @State private var showSaveAlert = false
+    @State private var playlistName = ""
+    @State private var saveFeedback: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     playbackOptions
+                    saveSection
 
                     if player.isPlaylistShuffleEnabled {
                         Text("셔플이 켜진 동안에는 수동 순서 변경이 비활성화됩니다.")
@@ -35,6 +41,20 @@ struct PlaybackQueueView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .alert(
+            "재생 목록 저장",
+            isPresented: $showSaveAlert
+        ) {
+            TextField("재생 목록 이름", text: $playlistName)
+
+            Button("취소", role: .cancel) {}
+
+            Button("저장") {
+                saveCurrentPlaylist()
+            }
+        } message: {
+            Text("같은 이름이 이미 있으면 현재 목록으로 교체합니다.")
+        }
     }
 
     private var playbackOptions: some View {
@@ -89,6 +109,37 @@ struct PlaybackQueueView: View {
                 style: .continuous
             )
         )
+    }
+
+    private var saveSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Button {
+                playlistName = "재생 목록 "
+                    + Date().formatted(
+                        .dateTime
+                            .month()
+                            .day()
+                            .hour()
+                            .minute()
+                    )
+                showSaveAlert = true
+            } label: {
+                Label(
+                    "현재 재생 목록 저장",
+                    systemImage: "square.and.arrow.down"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(player.playlistItems.isEmpty)
+
+            if let saveFeedback {
+                Text(saveFeedback)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     private var queueList: some View {
@@ -203,5 +254,24 @@ struct PlaybackQueueView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
+    }
+
+    private func saveCurrentPlaylist() {
+        do {
+            let result = try savedPlaylistStore.save(
+                name: playlistName,
+                urls: player.playlistItems.map(\.url)
+            )
+
+            if result.skippedCount > 0 {
+                saveFeedback =
+                    "\(result.savedCount)개 저장 완료 · "
+                    + "저장하지 못한 파일 \(result.skippedCount)개"
+            } else {
+                saveFeedback = "\(result.savedCount)개 저장 완료"
+            }
+        } catch {
+            saveFeedback = error.localizedDescription
+        }
     }
 }
