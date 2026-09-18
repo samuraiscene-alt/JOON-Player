@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PlayerScreen: View {
     @ObservedObject var player: PlayerViewModel
@@ -22,6 +23,11 @@ struct PlayerScreen: View {
     @State private var horizontalSeekTargetSeconds: Double?
     @State private var horizontalSeekDeltaSeconds: Double = 0
     @State private var horizontalSeekFeedbackTask: Task<Void, Never>?
+
+    @State private var activeScreenDrag: ScreenDragMode?
+    @State private var verticalAdjustmentStartValue: Double?
+    @State private var verticalAdjustmentFeedback: VerticalAdjustmentFeedback?
+    @State private var verticalAdjustmentFeedbackTask: Task<Void, Never>?
 
     @State private var temporarySpeedActivationTask: Task<Void, Never>?
     @State private var temporarySpeedTapSuppressionTask: Task<Void, Never>?
@@ -57,6 +63,12 @@ struct PlayerScreen: View {
                 .transition(.opacity.combined(with: .scale))
             }
 
+            if let verticalAdjustmentFeedback {
+                verticalAdjustmentOverlay(verticalAdjustmentFeedback)
+                    .allowsHitTesting(false)
+                    .transition(.opacity.combined(with: .scale))
+            }
+
             if isTemporaryDoubleSpeed {
                 temporarySpeedOverlay
                     .allowsHitTesting(false)
@@ -83,6 +95,10 @@ struct PlayerScreen: View {
         .animation(
             .easeOut(duration: 0.14),
             value: horizontalSeekTargetSeconds
+        )
+        .animation(
+            .easeOut(duration: 0.14),
+            value: verticalAdjustmentFeedback
         )
         .onAppear {
             scheduleAutoHideIfNeeded()
@@ -115,8 +131,14 @@ struct PlayerScreen: View {
         .onDisappear {
             seekFeedbackTask?.cancel()
             horizontalSeekFeedbackTask?.cancel()
+            verticalAdjustmentFeedbackTask?.cancel()
             temporarySpeedTapSuppressionTask?.cancel()
+
+            activeScreenDrag = nil
+            verticalAdjustmentStartValue = nil
+            verticalAdjustmentFeedback = nil
             suppressNextSingleTap = false
+
             endTemporaryDoubleSpeed()
             autoHideTask?.cancel()
         }
@@ -183,6 +205,30 @@ struct PlayerScreen: View {
                             }
                     )
             )
+            .simultaneousGesture(
+                verticalAdjustmentGesture(
+                    for: direction == .backward
+                        ? .brightness
+                        : .volume
+                )
+            )
+    }
+
+    private func verticalAdjustmentGesture(
+        for mode: ScreenDragMode
+    ) -> some Gesture {
+        DragGesture(
+            minimumDistance: PlaybackGestureTuning.verticalMinimumDistance
+        )
+        .onChanged { value in
+            handleVerticalAdjustmentChanged(
+                mode: mode,
+                translation: value.translation
+            )
+        }
+        .onEnded { _ in
+            handleVerticalAdjustmentEnded(mode: mode)
+        }
     }
 
     private func seekFeedbackOverlay(
@@ -257,6 +303,46 @@ struct PlayerScreen: View {
                 style: .continuous
             )
         )
+    }
+
+    private func verticalAdjustmentOverlay(
+        _ feedback: VerticalAdjustmentFeedback
+    ) -> some View {
+        HStack {
+            if feedback.mode == .volume {
+                Spacer()
+            }
+
+            VStack(spacing: 9) {
+                Image(systemName: feedback.systemImage)
+                    .font(.system(size: 27, weight: .semibold))
+
+                Text(feedback.title)
+                    .font(.caption.weight(.semibold))
+
+                Text("\(Int((feedback.value * 100).rounded()))%")
+                    .font(.headline.monospacedDigit())
+
+                ProgressView(value: feedback.value)
+                    .tint(.white)
+                    .frame(width: 72)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 14)
+            .background(.ultraThinMaterial)
+            .clipShape(
+                RoundedRectangle(
+                    cornerRadius: 18,
+                    style: .continuous
+                )
+            )
+            .padding(.horizontal, isLandscape ? 70 : 28)
+
+            if feedback.mode == .brightness {
+                Spacer()
+            }
+        }
     }
 
     private var temporarySpeedOverlay: some View {
@@ -494,7 +580,8 @@ struct PlayerScreen: View {
                     !isControlsLocked,
                     player.isPlaying,
                     horizontalSeekStartSeconds == nil,
-                    horizontalSeekTargetSeconds == nil
+                    horizontalSeekTargetSeconds == nil,
+                    activeScreenDrag == nil
                 else {
                     return
                 }
@@ -564,6 +651,12 @@ struct PlayerScreen: View {
     ) {
         guard !isControlsLocked else { return }
         guard player.durationSeconds > 0 else { return }
+        guard
+            activeScreenDrag == nil
+            || activeScreenDrag == .horizontalSeek
+        else {
+            return
+        }
 
         let horizontal = abs(translation.width)
         let vertical = abs(translation.height)
@@ -576,6 +669,7 @@ struct PlayerScreen: View {
         }
 
         if horizontalSeekStartSeconds == nil {
+            activeScreenDrag = .horizontalSeek
             endTemporaryDoubleSpeed()
             horizontalSeekStartSeconds = player.currentSeconds
             seekGestureFeedback = nil
@@ -606,6 +700,12 @@ struct PlayerScreen: View {
     private func handleHorizontalSeekEnded(
         translation: CGSize
     ) {
+        guard activeScreenDrag == .horizontalSeek else {
+            return
+        }
+
+        activeScreenDrag = nil
+
         guard
             !isControlsLocked,
             let targetSeconds = horizontalSeekTargetSeconds
@@ -640,6 +740,126 @@ struct PlayerScreen: View {
         horizontalSeekStartSeconds = nil
         horizontalSeekTargetSeconds = nil
         horizontalSeekDeltaSeconds = 0
+    }
+
+    private func handleVerticalAdjustmentChanged(
+        mode: ScreenDragMode,
+        translation: CGSize
+    ) {
+        guard !isControlsLocked else { return }
+        guard mode == .brightness || mode == .volume else { return }
+        guard
+            activeScreenDrag == nil
+            || activeScreenDrag == mode
+        else {
+            return
+        }
+
+        let horizontal = abs(translation.width)
+        let vertical = abs(translation.height)
+
+        guard vertical > max(
+            horizontal * PlaybackGestureTuning.verticalDominanceRatio,
+            PlaybackGestureTuning.verticalRecognitionThreshold
+        ) else {
+            return
+        }
+
+        if activeScreenDrag == nil {
+            activeScreenDrag = mode
+            endTemporaryDoubleSpeed()
+
+            switch mode {
+            case .brightness:
+                verticalAdjustmentStartValue =
+                    Double(UIScreen.main.brightness)
+
+            case .volume:
+                verticalAdjustmentStartValue = player.volume
+
+            case .horizontalSeek:
+                return
+            }
+
+            horizontalSeekFeedbackTask?.cancel()
+            horizontalSeekStartSeconds = nil
+            horizontalSeekTargetSeconds = nil
+            horizontalSeekDeltaSeconds = 0
+
+            seekFeedbackTask?.cancel()
+            seekGestureFeedback = nil
+
+            verticalAdjustmentFeedbackTask?.cancel()
+            showVolumePopup = false
+            showSettings = false
+            suppressNextSingleTap = true
+            autoHideTask?.cancel()
+        }
+
+        guard let startValue = verticalAdjustmentStartValue else {
+            return
+        }
+
+        let delta =
+            Double(-translation.height)
+            * PlaybackGestureTuning.verticalValuePerPoint
+
+        var target = startValue + delta
+
+        if mode == .brightness {
+            target = min(
+                max(target, PlaybackGestureTuning.minimumBrightness),
+                1
+            )
+            UIScreen.main.brightness = CGFloat(target)
+        } else {
+            target = min(max(target, 0), 1)
+            player.setVolume(target)
+        }
+
+        verticalAdjustmentFeedback = VerticalAdjustmentFeedback(
+            mode: mode,
+            value: target
+        )
+    }
+
+    private func handleVerticalAdjustmentEnded(
+        mode: ScreenDragMode
+    ) {
+        guard activeScreenDrag == mode else { return }
+
+        activeScreenDrag = nil
+        verticalAdjustmentStartValue = nil
+
+        verticalAdjustmentFeedbackTask?.cancel()
+        verticalAdjustmentFeedbackTask = Task {
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning.verticalFeedbackMilliseconds
+                )
+            )
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                verticalAdjustmentFeedback = nil
+            }
+        }
+
+        temporarySpeedTapSuppressionTask?.cancel()
+        temporarySpeedTapSuppressionTask = Task {
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning.tapSuppressionMilliseconds
+                )
+            )
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                suppressNextSingleTap = false
+            }
+        }
+
+        scheduleAutoHideIfNeeded()
     }
 
     private func handleSingleTap() {
@@ -725,9 +945,15 @@ struct PlayerScreen: View {
         showPlaylist = false
         seekFeedbackTask?.cancel()
         horizontalSeekFeedbackTask?.cancel()
+        verticalAdjustmentFeedbackTask?.cancel()
         temporarySpeedTapSuppressionTask?.cancel()
+
         seekGestureFeedback = nil
+        activeScreenDrag = nil
+        verticalAdjustmentStartValue = nil
+        verticalAdjustmentFeedback = nil
         suppressNextSingleTap = false
+
         clearHorizontalSeekFeedback()
         endTemporaryDoubleSpeed()
         autoHideTask?.cancel()
@@ -808,12 +1034,60 @@ private enum PlaybackGestureTuning {
     static let horizontalDominanceRatio: CGFloat = 1.2
     static let horizontalSeekSecondsPerPoint: Double = 0.12
 
+    static let verticalMinimumDistance: CGFloat = 18
+    static let verticalRecognitionThreshold: CGFloat = 14
+    static let verticalDominanceRatio: CGFloat = 1.2
+    static let verticalValuePerPoint: Double = 0.0035
+    static let minimumBrightness: Double = 0.01
+    static let verticalFeedbackMilliseconds = 500
+
     static let temporarySpeedHoldMilliseconds = 350
     static let maximumPressMovement: CGFloat = 18
     static let tapSuppressionMilliseconds = 220
 
     static let doubleTapFeedbackMilliseconds = 650
     static let horizontalSeekFeedbackMilliseconds = 500
+}
+
+private enum ScreenDragMode: Equatable {
+    case horizontalSeek
+    case brightness
+    case volume
+}
+
+private struct VerticalAdjustmentFeedback: Equatable {
+    let mode: ScreenDragMode
+    let value: Double
+
+    var title: String {
+        switch mode {
+        case .brightness:
+            return "밝기"
+        case .volume:
+            return "볼륨"
+        case .horizontalSeek:
+            return ""
+        }
+    }
+
+    var systemImage: String {
+        switch mode {
+        case .brightness:
+            return "sun.max.fill"
+        case .volume:
+            if value <= 0.001 {
+                return "speaker.slash.fill"
+            } else if value < 0.34 {
+                return "speaker.wave.1.fill"
+            } else if value < 0.67 {
+                return "speaker.wave.2.fill"
+            } else {
+                return "speaker.wave.3.fill"
+            }
+        case .horizontalSeek:
+            return "arrow.left.and.right"
+        }
+    }
 }
 
 private enum SeekGestureFeedback: Equatable {
