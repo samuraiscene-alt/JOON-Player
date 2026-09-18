@@ -22,6 +22,36 @@ enum VideoDisplayMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum SubtitleVerticalPosition: String, CaseIterable, Identifiable {
+    case standard
+    case raised
+    case high
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard:
+            return "기본"
+        case .raised:
+            return "위로"
+        case .high:
+            return "더 위로"
+        }
+    }
+
+    var bottomMargin: Int {
+        switch self {
+        case .standard:
+            return 0
+        case .raised:
+            return 60
+        case .high:
+            return 120
+        }
+    }
+}
+
 @MainActor
 final class PlayerViewModel: NSObject, ObservableObject {
     @Published var hasMedia = false
@@ -40,6 +70,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var subtitleName: String?
     @Published var subtitleWasAutoLoaded = false
     @Published var subtitleDelayMilliseconds = 0
+    @Published var subtitleFontScale: Float = 1.0
+    @Published var subtitleVerticalPosition: SubtitleVerticalPosition = .standard
 
     @Published var isPictureInPictureReady = false
     @Published var isPictureInPictureActive = false
@@ -63,9 +95,36 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private var pendingResumeSeconds: Double?
     private var lastSavedResumeSecond = -1
 
+    private var pendingSubtitlePositionRestartSeconds: Double?
+    private var shouldResumeAfterSubtitlePositionRestart = true
+
+    private enum PreferenceKey {
+        static let subtitleFontScale = "joonplayer.subtitle.fontScale"
+        static let subtitleVerticalPosition = "joonplayer.subtitle.verticalPosition"
+    }
+
     override init() {
         super.init()
+
+        let defaults = UserDefaults.standard
+
+        if let savedScale = defaults.object(
+            forKey: PreferenceKey.subtitleFontScale
+        ) as? NSNumber {
+            subtitleFontScale = min(max(savedScale.floatValue, 0.6), 1.8)
+        }
+
+        if
+            let rawPosition = defaults.string(
+                forKey: PreferenceKey.subtitleVerticalPosition
+            ),
+            let savedPosition = SubtitleVerticalPosition(rawValue: rawPosition)
+        {
+            subtitleVerticalPosition = savedPosition
+        }
+
         mediaPlayer.delegate = self
+        mediaPlayer.currentSubTitleFontScale = subtitleFontScale
         configureAudioSession()
     }
 
@@ -127,7 +186,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
         isUsingSecurityScope = url.startAccessingSecurityScopedResource()
 
         currentResumeIdentifier = PlaybackResumeStore.identifier(for: url)
-        pendingResumeSeconds = currentResumeIdentifier.flatMap { resumeStore.position(for: $0) }
+        pendingResumeSeconds = currentResumeIdentifier.flatMap {
+            resumeStore.position(for: $0)
+        }
         lastSavedResumeSecond = -1
 
         hasMedia = true
@@ -141,10 +202,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleName = nil
         subtitleWasAutoLoaded = false
         subtitleDelayMilliseconds = 0
+        pendingSubtitlePositionRestartSeconds = nil
 
-        let media = VLCMedia(url: url)
-        mediaPlayer.media = media
+        mediaPlayer.media = makeMedia(url: url)
         mediaPlayer.rate = playbackRate
+        mediaPlayer.currentSubTitleFontScale = subtitleFontScale
 
         if let automaticSubtitle = findAutomaticSubtitle(for: url) {
             queueSubtitle(url: automaticSubtitle, isAutomatic: true)
@@ -243,6 +305,39 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.currentVideoSubTitleDelay = clamped * 1_000
     }
 
+    func adjustSubtitleFontScale(by delta: Float) {
+        setSubtitleFontScale(subtitleFontScale + delta)
+    }
+
+    func resetSubtitleFontScale() {
+        setSubtitleFontScale(1.0)
+    }
+
+    func setSubtitleFontScale(_ scale: Float) {
+        let clamped = min(max(scale, 0.6), 1.8)
+        let rounded = (clamped * 10).rounded() / 10
+
+        subtitleFontScale = rounded
+        mediaPlayer.currentSubTitleFontScale = rounded
+
+        UserDefaults.standard.set(
+            rounded,
+            forKey: PreferenceKey.subtitleFontScale
+        )
+    }
+
+    func setSubtitleVerticalPosition(_ position: SubtitleVerticalPosition) {
+        guard subtitleVerticalPosition != position else { return }
+
+        subtitleVerticalPosition = position
+        UserDefaults.standard.set(
+            position.rawValue,
+            forKey: PreferenceKey.subtitleVerticalPosition
+        )
+
+        restartMediaForSubtitlePositionIfNeeded()
+    }
+
     func persistPlaybackProgress() {
         guard
             let currentResumeIdentifier,
@@ -282,6 +377,10 @@ final class PlayerViewModel: NSObject, ObservableObject {
         return String(format: "%+.1f초", seconds)
     }
 
+    var formattedSubtitleFontScale: String {
+        "\(Int((subtitleFontScale * 100).rounded()))%"
+    }
+
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
 
@@ -291,6 +390,14 @@ final class PlayerViewModel: NSObject, ObservableObject {
         } catch {
             // PiP/백그라운드 오디오 설정 실패가 영상 재생 자체를 막지는 않게 둔다.
         }
+    }
+
+    private func makeMedia(url: URL) -> VLCMedia {
+        let media = VLCMedia(url: url)
+        media.addOption(
+            ":sub-margin=\(subtitleVerticalPosition.bottomMargin)"
+        )
+        return media
     }
 
     private func applyVolumeToEngine() {
@@ -324,6 +431,45 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
     private func invalidatePictureInPicturePlaybackState() {
         pictureInPictureController?.invalidatePlaybackState()
+    }
+
+    private func restartMediaForSubtitlePositionIfNeeded() {
+        guard
+            hasMedia,
+            subtitleName != nil,
+            let videoURL = securityScopedURL
+        else {
+            return
+        }
+
+        pendingSubtitlePositionRestartSeconds = currentSeconds
+        shouldResumeAfterSubtitlePositionRestart = isPlaying
+
+        if subtitleURL != nil {
+            subtitleNeedsAttach = true
+        }
+
+        isLoading = true
+        mediaPlayer.stop()
+        mediaPlayer.media = makeMedia(url: videoURL)
+        mediaPlayer.rate = playbackRate
+        mediaPlayer.currentSubTitleFontScale = subtitleFontScale
+        applyVolumeToEngine()
+        applyVideoDisplayMode()
+        mediaPlayer.play()
+    }
+
+    private func applyPendingSubtitlePositionRestartIfPossible() {
+        guard let restartSeconds = pendingSubtitlePositionRestartSeconds else {
+            return
+        }
+
+        pendingSubtitlePositionRestartSeconds = nil
+        seek(to: restartSeconds)
+
+        if !shouldResumeAfterSubtitlePositionRestart {
+            mediaPlayer.pause()
+        }
     }
 
     private func applyPendingResumeIfPossible() {
@@ -409,6 +555,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
             subtitleName = subtitleURL.lastPathComponent
             subtitleWasAutoLoaded = pendingSubtitleIsAutomatic
             mediaPlayer.currentVideoSubTitleDelay = subtitleDelayMilliseconds * 1_000
+            mediaPlayer.currentSubTitleFontScale = subtitleFontScale
         } else {
             let wasAutomatic = pendingSubtitleIsAutomatic
             releaseSubtitleScope()
@@ -490,7 +637,9 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             isPlaying = true
             refreshDuration()
             applyPendingResumeIfPossible()
+            applyPendingSubtitlePositionRestartIfPossible()
             applyVideoDisplayMode()
+            mediaPlayer.currentSubTitleFontScale = subtitleFontScale
             attachPendingSubtitleIfPossible()
 
         case .paused:
