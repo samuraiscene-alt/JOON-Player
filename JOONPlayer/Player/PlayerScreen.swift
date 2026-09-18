@@ -24,10 +24,12 @@ struct PlayerScreen: View {
     @State private var horizontalSeekFeedbackTask: Task<Void, Never>?
 
     @State private var temporarySpeedActivationTask: Task<Void, Never>?
+    @State private var temporarySpeedTapSuppressionTask: Task<Void, Never>?
     @State private var isTemporarySpeedPressTracking = false
     @State private var temporarySpeedPressCancelled = false
     @State private var temporarySpeedPreviousRate: Float?
     @State private var isTemporaryDoubleSpeed = false
+    @State private var suppressNextSingleTap = false
 
     @State private var autoHideTask: Task<Void, Never>?
 
@@ -113,6 +115,8 @@ struct PlayerScreen: View {
         .onDisappear {
             seekFeedbackTask?.cancel()
             horizontalSeekFeedbackTask?.cancel()
+            temporarySpeedTapSuppressionTask?.cancel()
+            suppressNextSingleTap = false
             endTemporaryDoubleSpeed()
             autoHideTask?.cancel()
         }
@@ -130,7 +134,9 @@ struct PlayerScreen: View {
     }
 
     private var horizontalSeekDragGesture: some Gesture {
-        DragGesture(minimumDistance: 18)
+        DragGesture(
+            minimumDistance: PlaybackGestureTuning.horizontalSeekMinimumDistance
+        )
             .onChanged { value in
                 handleHorizontalSeekChanged(
                     translation: value.translation
@@ -151,7 +157,12 @@ struct PlayerScreen: View {
                 )
             }
             .onEnded { _ in
+                let wasActive = isTemporaryDoubleSpeed
                 endTemporaryDoubleSpeed()
+
+                if wasActive {
+                    scheduleAutoHideIfNeeded()
+                }
             }
     }
 
@@ -448,7 +459,7 @@ struct PlayerScreen: View {
             translation.height
         )
 
-        if distance > 18 {
+        if distance > PlaybackGestureTuning.maximumPressMovement {
             temporarySpeedPressCancelled = true
             temporarySpeedActivationTask?.cancel()
             temporarySpeedActivationTask = nil
@@ -469,7 +480,11 @@ struct PlayerScreen: View {
 
         temporarySpeedActivationTask?.cancel()
         temporarySpeedActivationTask = Task {
-            try? await Task.sleep(for: .milliseconds(350))
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning.temporarySpeedHoldMilliseconds
+                )
+            )
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
@@ -477,7 +492,9 @@ struct PlayerScreen: View {
                     isTemporarySpeedPressTracking,
                     !temporarySpeedPressCancelled,
                     !isControlsLocked,
-                    player.isPlaying
+                    player.isPlaying,
+                    horizontalSeekStartSeconds == nil,
+                    horizontalSeekTargetSeconds == nil
                 else {
                     return
                 }
@@ -492,6 +509,9 @@ struct PlayerScreen: View {
 
         temporarySpeedPreviousRate = player.playbackRate
         isTemporaryDoubleSpeed = true
+        suppressNextSingleTap = true
+
+        temporarySpeedTapSuppressionTask?.cancel()
 
         seekFeedbackTask?.cancel()
         seekGestureFeedback = nil
@@ -518,6 +538,22 @@ struct PlayerScreen: View {
             }
 
             isTemporaryDoubleSpeed = false
+
+            temporarySpeedTapSuppressionTask?.cancel()
+            temporarySpeedTapSuppressionTask = Task {
+                try? await Task.sleep(
+                    for: .milliseconds(
+                        PlaybackGestureTuning.tapSuppressionMilliseconds
+                    )
+                )
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run {
+                    suppressNextSingleTap = false
+                }
+            }
+        } else if !isTemporarySpeedPressTracking {
+            suppressNextSingleTap = false
         }
 
         temporarySpeedPreviousRate = nil
@@ -532,7 +568,10 @@ struct PlayerScreen: View {
         let horizontal = abs(translation.width)
         let vertical = abs(translation.height)
 
-        guard horizontal > max(vertical * 1.2, 14) else {
+        guard horizontal > max(
+            vertical * PlaybackGestureTuning.horizontalDominanceRatio,
+            PlaybackGestureTuning.horizontalRecognitionThreshold
+        ) else {
             return
         }
 
@@ -551,8 +590,9 @@ struct PlayerScreen: View {
             return
         }
 
-        let sensitivity = 0.12
-        let rawDelta = Double(translation.width) * sensitivity
+        let rawDelta =
+            Double(translation.width)
+            * PlaybackGestureTuning.horizontalSeekSecondsPerPoint
 
         let target = min(
             max(startSeconds + rawDelta, 0),
@@ -579,7 +619,11 @@ struct PlayerScreen: View {
 
         horizontalSeekFeedbackTask?.cancel()
         horizontalSeekFeedbackTask = Task {
-            try? await Task.sleep(for: .milliseconds(500))
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning.horizontalSeekFeedbackMilliseconds
+                )
+            )
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
@@ -601,6 +645,14 @@ struct PlayerScreen: View {
     private func handleSingleTap() {
         guard !isControlsLocked else { return }
         guard !isTemporaryDoubleSpeed else { return }
+
+        if suppressNextSingleTap {
+            suppressNextSingleTap = false
+            temporarySpeedTapSuppressionTask?.cancel()
+            temporarySpeedTapSuppressionTask = nil
+            return
+        }
+
         toggleControls()
     }
 
@@ -635,7 +687,11 @@ struct PlayerScreen: View {
         seekGestureFeedback = feedback
 
         seekFeedbackTask = Task {
-            try? await Task.sleep(for: .milliseconds(650))
+            try? await Task.sleep(
+                for: .milliseconds(
+                    PlaybackGestureTuning.doubleTapFeedbackMilliseconds
+                )
+            )
             guard !Task.isCancelled else { return }
 
             await MainActor.run {
@@ -669,7 +725,9 @@ struct PlayerScreen: View {
         showPlaylist = false
         seekFeedbackTask?.cancel()
         horizontalSeekFeedbackTask?.cancel()
+        temporarySpeedTapSuppressionTask?.cancel()
         seekGestureFeedback = nil
+        suppressNextSingleTap = false
         clearHorizontalSeekFeedback()
         endTemporaryDoubleSpeed()
         autoHideTask?.cancel()
@@ -743,6 +801,20 @@ struct PlayerScreen: View {
     }
 }
 
+
+private enum PlaybackGestureTuning {
+    static let horizontalSeekMinimumDistance: CGFloat = 18
+    static let horizontalRecognitionThreshold: CGFloat = 14
+    static let horizontalDominanceRatio: CGFloat = 1.2
+    static let horizontalSeekSecondsPerPoint: Double = 0.12
+
+    static let temporarySpeedHoldMilliseconds = 350
+    static let maximumPressMovement: CGFloat = 18
+    static let tapSuppressionMilliseconds = 220
+
+    static let doubleTapFeedbackMilliseconds = 650
+    static let horizontalSeekFeedbackMilliseconds = 500
+}
 
 private enum SeekGestureFeedback: Equatable {
     case backward
