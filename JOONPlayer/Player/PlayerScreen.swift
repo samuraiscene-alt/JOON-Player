@@ -44,7 +44,6 @@ struct PlayerScreen: View {
     @State private var temporarySpeedTapSuppressionTask: Task<Void, Never>?
     @State private var isTemporarySpeedPressTracking = false
     @State private var temporarySpeedPressCancelled = false
-    @State private var temporarySpeedPreviousRate: Float?
     @State private var isTemporaryDoubleSpeed = false
     @State private var suppressNextSingleTap = false
 
@@ -764,7 +763,6 @@ struct PlayerScreen: View {
     private func beginTemporaryDoubleSpeed() {
         guard !isTemporaryDoubleSpeed else { return }
 
-        temporarySpeedPreviousRate = player.playbackRate
         isTemporaryDoubleSpeed = true
         suppressNextSingleTap = true
 
@@ -778,7 +776,7 @@ struct PlayerScreen: View {
         horizontalSeekTargetSeconds = nil
         horizontalSeekDeltaSeconds = 0
 
-        player.setPlaybackRate(2.0)
+        player.applyTemporaryPlaybackRate(2.0)
         autoHideTask?.cancel()
     }
 
@@ -790,9 +788,7 @@ struct PlayerScreen: View {
         temporarySpeedPressCancelled = false
 
         if isTemporaryDoubleSpeed {
-            if let previousRate = temporarySpeedPreviousRate {
-                player.setPlaybackRate(previousRate)
-            }
+            player.applyTemporaryPlaybackRate(nil)
 
             isTemporaryDoubleSpeed = false
 
@@ -813,7 +809,6 @@ struct PlayerScreen: View {
             suppressNextSingleTap = false
         }
 
-        temporarySpeedPreviousRate = nil
     }
 
     private func handleHorizontalSeekChanged(

@@ -394,9 +394,16 @@ final class PlayerViewModel: NSObject, ObservableObject {
     private var activeAudioEqualizer: VLCAudioEqualizer?
 
     private enum PreferenceKey {
-        static let subtitleFontScale = "joonplayer.subtitle.fontScale"
-        static let subtitleVerticalPosition = "joonplayer.subtitle.verticalPosition"
-        static let playbackBookmarks = "joonplayer.playback.bookmarks.v1"
+        static let playbackRate =
+            "joonplayer.playback.rate"
+        static let videoDisplayMode =
+            "joonplayer.video.displayMode"
+        static let subtitleFontScale =
+            "joonplayer.subtitle.fontScale"
+        static let subtitleVerticalPosition =
+            "joonplayer.subtitle.verticalPosition"
+        static let playbackBookmarks =
+            "joonplayer.playback.bookmarks.v1"
     }
 
     private enum BookmarkRule {
@@ -408,6 +415,27 @@ final class PlayerViewModel: NSObject, ObservableObject {
         super.init()
 
         let defaults = UserDefaults.standard
+
+        if let savedRate = defaults.object(
+            forKey: PreferenceKey.playbackRate
+        ) as? NSNumber {
+            playbackRate = min(
+                max(savedRate.floatValue, 0.5),
+                2.0
+            )
+        }
+
+        if
+            let rawDisplayMode = defaults.string(
+                forKey: PreferenceKey.videoDisplayMode
+            ),
+            let savedDisplayMode =
+                VideoDisplayMode(
+                    rawValue: rawDisplayMode
+                )
+        {
+            videoDisplayMode = savedDisplayMode
+        }
 
         if let savedScale = defaults.object(
             forKey: PreferenceKey.subtitleFontScale
@@ -693,18 +721,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         textTrackOptions = []
         chapterOptions = []
 
-        subtitleName = nil
-        subtitleWasAutoLoaded = false
-        subtitleDelayMilliseconds = 0
-        audioDelayMilliseconds = 0
-        audioOutputMode = .automatic
-        audioEqualizerPresetIndex = nil
-        audioEqualizerIsCustom = false
-        audioEqualizerPreamp = 0
-        audioEqualizerBands = []
-        activeAudioEqualizer = nil
-        mediaPlayer.equalizer = nil
-        pendingSubtitlePositionRestartSeconds = nil
+        resetMediaScopedPlaybackSettings()
 
         mediaPlayer.media = makeMedia(url: url)
         mediaPlayer.rate = playbackRate
@@ -765,18 +782,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         textTrackOptions = []
         chapterOptions = []
 
-        subtitleName = nil
-        subtitleWasAutoLoaded = false
-        subtitleDelayMilliseconds = 0
-        audioDelayMilliseconds = 0
-        audioOutputMode = .automatic
-        audioEqualizerPresetIndex = nil
-        audioEqualizerIsCustom = false
-        audioEqualizerPreamp = 0
-        audioEqualizerBands = []
-        activeAudioEqualizer = nil
-        mediaPlayer.equalizer = nil
-        pendingSubtitlePositionRestartSeconds = nil
+        resetMediaScopedPlaybackSettings()
     }
 
     func togglePlayback() {
@@ -936,6 +942,24 @@ final class PlayerViewModel: NSObject, ObservableObject {
         let clamped = min(max(rate, 0.5), 2.0)
         playbackRate = clamped
         mediaPlayer.rate = clamped
+
+        UserDefaults.standard.set(
+            clamped,
+            forKey: PreferenceKey.playbackRate
+        )
+    }
+
+    func applyTemporaryPlaybackRate(
+        _ rate: Float?
+    ) {
+        if let rate {
+            mediaPlayer.rate = min(
+                max(rate, 0.5),
+                2.0
+            )
+        } else {
+            mediaPlayer.rate = playbackRate
+        }
     }
 
     func adjustAudioDelay(
@@ -1135,6 +1159,11 @@ final class PlayerViewModel: NSObject, ObservableObject {
     func setVideoDisplayMode(_ mode: VideoDisplayMode) {
         videoDisplayMode = mode
         applyVideoDisplayMode()
+
+        UserDefaults.standard.set(
+            mode.rawValue,
+            forKey: PreferenceKey.videoDisplayMode
+        )
     }
 
     func captureCurrentFrameSnapshot() async throws -> URL {
@@ -1980,6 +2009,24 @@ final class PlayerViewModel: NSObject, ObservableObject {
         default:
             return "\(channels)채널"
         }
+    }
+
+    private func resetMediaScopedPlaybackSettings() {
+        subtitleName = nil
+        subtitleWasAutoLoaded = false
+        subtitleDelayMilliseconds = 0
+
+        audioDelayMilliseconds = 0
+        audioOutputMode = .automatic
+
+        audioEqualizerPresetIndex = nil
+        audioEqualizerIsCustom = false
+        audioEqualizerPreamp = 0
+        audioEqualizerBands = []
+        activeAudioEqualizer = nil
+        mediaPlayer.equalizer = nil
+
+        pendingSubtitlePositionRestartSeconds = nil
     }
 
     private func applyAudioOutputMode() {
