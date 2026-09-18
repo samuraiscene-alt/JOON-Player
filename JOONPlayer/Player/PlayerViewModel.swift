@@ -1166,6 +1166,21 @@ final class PlayerViewModel: NSObject, ObservableObject {
         )
     }
 
+    func resetPersistentPlaybackPreferences() {
+        setPlaybackRate(1.0)
+        setVideoDisplayMode(.original)
+        setSubtitleFontScale(1.0)
+
+        if subtitleVerticalPosition != .standard {
+            setSubtitleVerticalPosition(.standard)
+        } else {
+            UserDefaults.standard.set(
+                SubtitleVerticalPosition.standard.rawValue,
+                forKey: PreferenceKey.subtitleVerticalPosition
+            )
+        }
+    }
+
     func captureCurrentFrameSnapshot() async throws -> URL {
         guard
             hasMedia,

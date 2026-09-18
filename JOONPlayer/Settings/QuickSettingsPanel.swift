@@ -23,6 +23,7 @@ struct QuickSettingsPanel: View {
     let onCaptureSnapshot: () -> Void
 
     @State private var expandedGroup: QuickSettingsGroup? = .playback
+    @State private var showResetPreferencesConfirmation = false
 
     private let rates: [Float] = [0.5, 1.0, 1.25, 1.5, 2.0]
 
@@ -83,6 +84,20 @@ struct QuickSettingsPanel: View {
         .onAppear {
             player.refreshAvailableTracks()
             player.refreshAvailableChapters()
+        }
+        .alert(
+            "앱 설정을 기본값으로 되돌릴까요?",
+            isPresented: $showResetPreferencesConfirmation
+        ) {
+            Button("취소", role: .cancel) {}
+
+            Button("초기화", role: .destructive) {
+                resetPersistentPreferences()
+            }
+        } message: {
+            Text(
+                "재생 속도, 화면비율, 자막 크기·위치, 퀵 액션 구성을 초기화합니다. 이어보기, 북마크, 최근 파일, 저장된 재생 목록은 삭제하지 않습니다."
+            )
         }
     }
 
@@ -244,6 +259,8 @@ struct QuickSettingsPanel: View {
             snapshotRow
             groupDivider
             chooseVideoRow
+            groupDivider
+            resetPreferencesRow
         }
     }
 
@@ -520,6 +537,36 @@ struct QuickSettingsPanel: View {
         .buttonStyle(.plain)
         .foregroundStyle(.white)
         .frame(minHeight: 44)
+    }
+
+    private var resetPreferencesRow: some View {
+        Button(role: .destructive) {
+            showResetPreferencesConfirmation = true
+        } label: {
+            HStack {
+                Label(
+                    "앱 설정 초기화",
+                    systemImage: "arrow.counterclockwise"
+                )
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.42))
+            }
+            .font(.subheadline)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: 44,
+                alignment: .leading
+            )
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.red.opacity(0.9))
+        .accessibilityHint(
+            "앱 전체 기본 설정만 초기화합니다. 이어보기와 북마크는 유지합니다."
+        )
     }
 
     private var playbackRateSection: some View {
@@ -1748,6 +1795,12 @@ struct QuickSettingsPanel: View {
         .accessibilityHint(
             "현재 영상을 새 컨테이너로 복구하거나 재인코딩합니다."
         )
+    }
+
+    private func resetPersistentPreferences() {
+        player.resetPersistentPlaybackPreferences()
+        quickActionStorage =
+            PlayerQuickAction.defaultStorageValue
     }
 
     private func addQuickAction(
