@@ -3,6 +3,11 @@ import Foundation
 import UIKit
 import VLCKit
 
+struct AudioEqualizerPresetOption: Identifiable, Equatable {
+    let id: Int
+    let name: String
+}
+
 enum AudioOutputMode: String, CaseIterable, Identifiable {
     case automatic
     case stereo
@@ -292,6 +297,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
     @Published var playbackRate: Float = 1.0
     @Published var audioDelayMilliseconds = 0
     @Published var audioOutputMode: AudioOutputMode = .automatic
+    @Published private(set) var audioEqualizerPresetIndex: Int?
     @Published var videoDisplayMode: VideoDisplayMode = .original
 
     @Published private(set) var abRepeatStartSeconds: Double?
@@ -653,12 +659,14 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleDelayMilliseconds = 0
         audioDelayMilliseconds = 0
         audioOutputMode = .automatic
+        audioEqualizerPresetIndex = nil
         pendingSubtitlePositionRestartSeconds = nil
 
         mediaPlayer.media = makeMedia(url: url)
         mediaPlayer.rate = playbackRate
         mediaPlayer.currentAudioPlaybackDelay = 0
         applyAudioOutputMode()
+        applyAudioEqualizer()
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
 
         if let automaticSubtitle = findAutomaticSubtitle(for: url) {
@@ -718,6 +726,8 @@ final class PlayerViewModel: NSObject, ObservableObject {
         subtitleDelayMilliseconds = 0
         audioDelayMilliseconds = 0
         audioOutputMode = .automatic
+        audioEqualizerPresetIndex = nil
+        mediaPlayer.equalizer = nil
         pendingSubtitlePositionRestartSeconds = nil
     }
 
@@ -898,6 +908,13 @@ final class PlayerViewModel: NSObject, ObservableObject {
     ) {
         audioOutputMode = mode
         applyAudioOutputMode()
+    }
+
+    func setAudioEqualizerPreset(
+        index: Int?
+    ) {
+        audioEqualizerPresetIndex = index
+        applyAudioEqualizer()
     }
 
     func setAudioDelay(
@@ -1298,6 +1315,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.currentAudioPlaybackDelay =
             audioDelayMilliseconds * 1_000
         applyAudioOutputMode()
+        applyAudioEqualizer()
         refreshAvailableTracks()
     }
 
@@ -1483,6 +1501,25 @@ final class PlayerViewModel: NSObject, ObservableObject {
 
         return mediaPlayer.state == .playing
             || mediaPlayer.state == .paused
+    }
+
+    var audioEqualizerPresetOptions: [AudioEqualizerPresetOption] {
+        VLCAudioEqualizer.presets.map { preset in
+            AudioEqualizerPresetOption(
+                id: Int(preset.index),
+                name: preset.name
+            )
+        }
+    }
+
+    var selectedAudioEqualizerPresetName: String {
+        guard let audioEqualizerPresetIndex else {
+            return "끔"
+        }
+
+        return audioEqualizerPresetOptions.first(
+            where: { $0.id == audioEqualizerPresetIndex }
+        )?.name ?? "끔"
     }
 
     var canAddPlaybackBookmark: Bool {
@@ -1801,6 +1838,28 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.audioStereoMode = mode
     }
 
+    private func applyAudioEqualizer() {
+        guard let audioEqualizerPresetIndex else {
+            mediaPlayer.equalizer = nil
+            return
+        }
+
+        guard let preset = VLCAudioEqualizer.presets.first(
+            where: {
+                Int($0.index)
+                    == audioEqualizerPresetIndex
+            }
+        ) else {
+            self.audioEqualizerPresetIndex = nil
+            mediaPlayer.equalizer = nil
+            return
+        }
+
+        mediaPlayer.equalizer = VLCAudioEqualizer(
+            preset: preset
+        )
+    }
+
     private func configureAudioSession() {
         let session = AVAudioSession.sharedInstance()
 
@@ -1876,6 +1935,7 @@ final class PlayerViewModel: NSObject, ObservableObject {
         mediaPlayer.currentAudioPlaybackDelay =
             audioDelayMilliseconds * 1_000
         applyAudioOutputMode()
+        applyAudioEqualizer()
         mediaPlayer.currentSubTitleFontScale = subtitleFontScale
         applyVolumeToEngine()
         applyVideoDisplayMode()
@@ -2162,6 +2222,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             mediaPlayer.currentAudioPlaybackDelay =
                 audioDelayMilliseconds * 1_000
             applyAudioOutputMode()
+            applyAudioEqualizer()
             mediaPlayer.currentSubTitleFontScale = subtitleFontScale
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()
@@ -2173,6 +2234,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
             mediaPlayer.currentAudioPlaybackDelay =
                 audioDelayMilliseconds * 1_000
             applyAudioOutputMode()
+            applyAudioEqualizer()
             persistPlaybackProgress()
             attachPendingSubtitleIfPossible()
             refreshAvailableTracks()

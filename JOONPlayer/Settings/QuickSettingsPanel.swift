@@ -62,6 +62,11 @@ struct QuickSettingsPanel: View {
                 Divider()
                     .overlay(.white.opacity(0.12))
 
+                equalizerSection
+
+                Divider()
+                    .overlay(.white.opacity(0.12))
+
                 chapterSection
 
                 Divider()
@@ -777,6 +782,99 @@ struct QuickSettingsPanel: View {
 
             Text(
                 "기본은 원본 출력을 유지합니다. 좌/우는 해당 채널만 듣고 싶을 때 사용할 수 있습니다."
+            )
+            .font(.caption2)
+            .foregroundStyle(.white.opacity(0.44))
+            .fixedSize(
+                horizontal: false,
+                vertical: true
+            )
+        }
+    }
+
+    private var equalizerSection: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Label(
+                    "이퀄라이저",
+                    systemImage: "slider.vertical.3"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(player.selectedAudioEqualizerPresetName)
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.48))
+                    .lineLimit(1)
+            }
+
+            Menu {
+                Button {
+                    player.setAudioEqualizerPreset(
+                        index: nil
+                    )
+                } label: {
+                    Label(
+                        "끔",
+                        systemImage:
+                            player.audioEqualizerPresetIndex == nil
+                            ? "checkmark"
+                            : "circle"
+                    )
+                }
+
+                Divider()
+
+                ForEach(
+                    player.audioEqualizerPresetOptions
+                ) { preset in
+                    Button {
+                        player.setAudioEqualizerPreset(
+                            index: preset.id
+                        )
+                    } label: {
+                        Label(
+                            preset.name,
+                            systemImage:
+                                player.audioEqualizerPresetIndex
+                                    == preset.id
+                                ? "checkmark"
+                                : "circle"
+                        )
+                    }
+                }
+            } label: {
+                HStack {
+                    Text(
+                        player.selectedAudioEqualizerPresetName
+                    )
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+
+                    Spacer()
+
+                    Image(
+                        systemName:
+                            "chevron.up.chevron.down"
+                    )
+                    .font(
+                        .system(
+                            size: 9,
+                            weight: .semibold
+                        )
+                    )
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(.white.opacity(0.1))
+                .clipShape(Capsule())
+            }
+
+            Text(
+                "VLCKit에 포함된 프리셋을 그대로 사용합니다. 끔을 선택하면 원본 음색으로 돌아갑니다."
             )
             .font(.caption2)
             .foregroundStyle(.white.opacity(0.44))
