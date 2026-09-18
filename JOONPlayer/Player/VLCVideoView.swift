@@ -35,6 +35,7 @@ struct VLCVideoView: UIViewRepresentable {
         player.updateDrawableSize(uiView.bounds.size)
     }
 
+    @MainActor
     final class Coordinator: NSObject {
         weak var hostView: UIView?
 
@@ -70,10 +71,8 @@ extension VLCVideoView.Coordinator: @preconcurrency VLCPictureInPictureDrawable 
 
     func pictureInPictureReady() -> (((any VLCPictureInPictureWindowControlling)?) -> Void)! {
         { [weak self] controller in
-            guard let self else { return }
-
-            Task { @MainActor in
-                self.playerModel?.registerPictureInPictureController(controller)
+            Task { @MainActor [weak self] in
+                self?.playerModel?.registerPictureInPictureController(controller)
             }
         }
     }
