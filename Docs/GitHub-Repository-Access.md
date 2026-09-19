@@ -9,23 +9,22 @@ Checked: 2026-09-19
 ## 현재 확인 상태
 
 - ChatGPT의 GitHub plugin permission: **Allow all actions**
-- 따라서 ChatGPT 쪽의 읽기/쓰기 동작 권한은 이미 허용되어 있다.
-- 현재 GitHub App installation에서 확인되는 repository는 `samuraiscene-alt/JOON-Player` 한 개뿐이다.
-- JOON Player에서는 `push: true`가 실제로 확인되었고 commit/push도 정상 동작한다.
+- GitHub App installation Repository access: **All repositories**
+- 현재 확인된 6개 repository 모두 `pull: true`, `push: true`, `admin: true`, `maintain: true`
+- JOON Player에서는 실제 commit/push 동작까지 이미 검증 완료
+- 따라서 앞으로 새 앱 개발과 기존 앱 수정 모두 같은 GitHub 연결 방식으로 진행 가능
 
-즉 현재 제한은 ChatGPT permission이 아니라 **GitHub App installation의 repository access 범위**다.
+## GitHub App 설정
 
-## 권장 GitHub App 설정
-
-개인 계정 `samuraiscene-alt`에 설치된 ChatGPT/Codex GitHub App의 Repository access를:
+개인 계정 `samuraiscene-alt`에 설치된 ChatGPT Codex Connector의 Repository access는 현재:
 
 ```text
 All repositories
 ```
 
-로 설정한다.
+로 설정 완료했다.
 
-이렇게 설정하면 기존 앱 repository뿐 아니라 앞으로 같은 GitHub 계정에 추가되는 repository도 별도로 하나씩 다시 연결하는 일을 줄일 수 있다.
+이 설정은 현재 repository와 앞으로 같은 계정에 생성되는 repository에 적용된다.
 
 ## 새 앱 개발 표준
 
@@ -98,3 +97,16 @@ Repository access를 `All repositories`로 바꾼 뒤 ChatGPT가 다음을 다�
 - admin/maintain 가능 여부
 
 를 확인하고 `Docs/Mac-Project-Registry.md`를 실제 GitHub 상태로 갱신한다.
+
+## 2026-09-19 실제 검증 결과
+
+다음 repository 모두 GitHub connector에서 발견되며 쓰기 권한까지 확인됨.
+
+- `samuraiscene-alt/smart-store-v1`
+- `samuraiscene-alt/JOON-Dashboard`
+- `samuraiscene-alt/-QR-Attendance`
+- `samuraiscene-alt/JOON-Player`
+- `samuraiscene-alt/SHINeJOON-Digital-Card`
+- `samuraiscene-alt/-lotto645`
+
+모두 기본 branch는 `main`이며 `push: true`를 확인했다.

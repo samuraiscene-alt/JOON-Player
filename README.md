@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 50 — Phase 49 기능 + GitHub 전체 프로젝트 쓰기 환경 표준화
+Phase 51 — Phase 50 기능 + 전체 앱 GitHub 쓰기 권한 검증 완료
 
 현재 포함된 기능:
 
@@ -197,6 +197,21 @@ Phase 50 — Phase 49 기능 + GitHub 전체 프로젝트 쓰기 환경 표준�
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## GitHub 전체 앱 쓰기 권한 검증 완료
+
+ChatGPT Codex Connector의 Repository access를 **All repositories**로 변경하고 계정의 주요 앱 repository를 다시 조회했습니다.
+
+다음 6개 repository 모두 `pull: true`, `push: true`, `admin: true`, `maintain: true`를 확인했습니다.
+
+- `samuraiscene-alt/smart-store-v1`
+- `samuraiscene-alt/JOON-Dashboard`
+- `samuraiscene-alt/-QR-Attendance`
+- `samuraiscene-alt/JOON-Player`
+- `samuraiscene-alt/SHINeJOON-Digital-Card`
+- `samuraiscene-alt/-lotto645`
+
+앞으로 새 앱 개발과 기존 앱 수정 모두 repository 확인 → 실제 코드 확인 → 수정 → commit → commit 재검증 순서로 작업합니다.
 
 ## GitHub 전체 프로젝트 쓰기 환경
 

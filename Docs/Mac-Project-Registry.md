@@ -7,10 +7,10 @@ Checked: 2026-09-19
 ## GitHub 작업 권한 상태
 
 - ChatGPT의 GitHub plugin permission은 **Allow all actions**로 확인됨.
-- 현재 설치 범위에서 실제 repository 쓰기까지 확인된 곳은 `samuraiscene-alt/JOON-Player`.
-- 다른 앱 repository가 안 보이는 원인은 ChatGPT의 쓰기 권한 부족이 아니라 GitHub App installation의 **Repository access 범위**로 판단됨.
+- GitHub App installation의 Repository access는 **All repositories**로 변경 완료.
+- 현재 계정에서 확인된 앱 repository 6개 모두 `pull: true`, `push: true`, `admin: true`, `maintain: true` 상태를 확인함.
+- 앞으로 같은 계정에 새 repository를 만들면 별도 선택 없이 GitHub App 접근 대상에 포함된다.
 - 표준 설정과 검증 절차는 `Docs/GitHub-Repository-Access.md`를 기준으로 한다.
-- Repository access를 `All repositories`로 변경한 뒤 전체 앱 repository를 다시 조회해 이 Registry를 실제 상태로 갱신한다.
 
 원칙:
 - 각 앱의 실제 소스는 **각 앱의 GitHub 저장소가 원본(Source of Truth)** 이다.
@@ -74,7 +74,7 @@ Mac 재개 시:
 4. Supabase 연결 정보는 GitHub에 비밀키를 저장하지 않고 별도 보안 설정에서 연결
 5. 기존 정상 작동 기능을 먼저 확인한 뒤 작업 재개
 
-현재 ChatGPT GitHub 연결에서는 이 저장소에 대한 쓰기 권한이 확인되지 않았으므로, 이 문서에는 위치와 재개 원칙만 보존한다.
+현재 ChatGPT GitHub 연결에서 이 저장소는 `push: true`까지 확인되어 실제 수정·commit 작업이 가능하다.
 
 ## 3. QR - Attendance
 
@@ -85,7 +85,9 @@ Mac 재개 시:
 - 확인된 구성: `index.html`, `style.css`, `app.js`, `manifest.json`, `service-worker.js`, PWA 아이콘
 - 주요 기능 진행 이력: 집결지 QR / 현장 QR / 대리 QR, 행사 상태 전환/종료, 새로고침 유지, QR 회귀 테스트
 - 상태: 개발 이력 존재
-- GitHub 저장소명: 현재 연결된 GitHub 범위에서는 확인되지 않음
+- GitHub 저장소: `samuraiscene-alt/-QR-Attendance`
+- Branch: `main`
+- GitHub 쓰기 권한: `push: true` 확인
 
 Mac 재개 전 가장 먼저 해야 할 일:
 1. 실제 GitHub 저장소명을 확인
@@ -103,7 +105,9 @@ Mac 재개 전 가장 먼저 해야 할 일:
 - 용도: 개인 통합 대시보드
 - 연결 대상 이력: 디지털 명함, 로또 분석기 등
 - Mac에서는 웹 프로젝트이므로 저장소 clone 후 HTML/CSS/JS 기반으로 바로 이어서 작업 가능
-- 현재 GitHub 연결에서는 저장소 접근 여부가 확인되지 않음
+- GitHub 저장소: `samuraiscene-alt/JOON-Dashboard`
+- Branch: `main`
+- GitHub 쓰기 권한: `push: true` 확인
 
 ## 5. Digital Card
 
@@ -111,8 +115,9 @@ Mac 재개 전 가장 먼저 해야 할 일:
 - 프로젝트명 이력: `SHINeJOON Digital Card`
 - 주요 기능: 연락처 저장, 지도, 문자, 공유, Instagram, 갤러리, QR, 관리자 화면
 - Mac에서는 기존 GitHub 저장소와 Supabase 프로젝트를 연결해 그대로 이어서 작업 가능
-- 정확한 GitHub repository identifier는 현재 연결 범위에서 재확인 필요
-- 저장소명을 추측해서 새로 만들지 않는다
+- GitHub 저장소: `samuraiscene-alt/SHINeJOON-Digital-Card`
+- Branch: `main`
+- GitHub 쓰기 권한: `push: true` 확인
 
 ## 6. Lotto Analyzer V2
 
@@ -126,20 +131,20 @@ Mac 재개 전 가장 먼저 해야 할 일:
   - `.github/workflows/update-lotto.yml`
 - 자동 업데이트 기준: 매주 일요일 21:10 KST
 - Mac에서는 저장소 clone 후 웹 코드와 GitHub Actions를 그대로 이어서 작업 가능
-- 정확한 GitHub repository identifier는 현재 연결 범위에서 재확인 필요
+- GitHub 저장소: `samuraiscene-alt/-lotto645`
+- Branch: `main`
+- GitHub 쓰기 권한: `push: true` 확인
 
 ## Mac 이전 상태 표
 
 | 프로젝트 | 소스 원본 | Mac 재개 준비 |
 | --- | --- | --- |
-| JOON Player | GitHub `samuraiscene-alt/JOON-Player` | 준비 완료 |
-| Smart Store | GitHub `samuraiscene-alt/smart-store-v1` | 소스 위치 알려짐, 현재 connector 쓰기 접근 미확인 |
-| QR - Attendance | GitHub 저장소 확인 필요 | 저장소 식별 필요 |
-| JOON Dashboard | `JOON-Dashboard` 이력 | connector 접근 재확인 필요 |
-| Digital Card | 기존 GitHub + Supabase | repo identifier 재확인 필요 |
-| Lotto Analyzer V2 | 기존 GitHub Pages 저장소 | repo identifier 재확인 필요 |
-
-이 표에서 **확인 필요**인 항목은 소스가 없다는 뜻이 아니라, 현재 ChatGPT에 연결된 GitHub 범위에서 repository identifier 또는 쓰기 권한을 확인하지 못했다는 뜻이다.
+| JOON Player | GitHub `samuraiscene-alt/JOON-Player` | 읽기/쓰기 확인 완료 |
+| Smart Store | GitHub `samuraiscene-alt/smart-store-v1` | 읽기/쓰기 확인 완료 |
+| QR - Attendance | GitHub `samuraiscene-alt/-QR-Attendance` | 읽기/쓰기 확인 완료 |
+| JOON Dashboard | GitHub `samuraiscene-alt/JOON-Dashboard` | 읽기/쓰기 확인 완료 |
+| Digital Card | GitHub `samuraiscene-alt/SHINeJOON-Digital-Card` | 읽기/쓰기 확인 완료 |
+| Lotto Analyzer V2 | GitHub `samuraiscene-alt/-lotto645` | 읽기/쓰기 확인 완료 |
 
 ## Mac으로 넘어갈 때의 공통 규칙
 
