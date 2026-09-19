@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 import UIKit
-import VLCKit
+@preconcurrency import VLCKit
 
 struct AudioEqualizerPresetOption: Identifiable, Equatable {
     let id: Int
@@ -460,7 +460,14 @@ final class PlayerViewModel: NSObject, ObservableObject {
     deinit {
         sleepTimerTask?.cancel()
         mediaPlayer.stop()
-        releaseCurrentFileAccess()
+
+        if isUsingSubtitleScope {
+            subtitleURL?.stopAccessingSecurityScopedResource()
+        }
+
+        if isUsingSecurityScope {
+            securityScopedURL?.stopAccessingSecurityScopedResource()
+        }
     }
 
     func attach(to drawable: AnyObject) {
@@ -2527,8 +2534,9 @@ final class PlayerViewModel: NSObject, ObservableObject {
     }
 }
 
-extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
-    func mediaPlayerStateChanged(_ newState: VLCMediaPlayerState) {
+    private func handleMediaPlayerStateChanged(
+        _ newState: VLCMediaPlayerState
+    ) {
         switch newState {
         case .opening, .buffering:
             isLoading = true
@@ -2619,7 +2627,7 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         invalidatePictureInPicturePlaybackState()
     }
 
-    func mediaPlayerTimeChanged(_ aNotification: Notification) {
+    private func handleMediaPlayerTimeChanged() {
         refreshTime()
         refreshDuration()
         lastObservedPlaybackSecond = currentSeconds
@@ -2629,11 +2637,43 @@ extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
         saveResumeProgressIfNeeded()
     }
 
-    func mediaPlayerLengthChanged(_ length: Int64) {
+    private func handleMediaPlayerLengthChanged(
+        _ length: Int64
+    ) {
         if length > 0 {
             durationSeconds = Double(length) / 1000.0
         }
 
         invalidatePictureInPicturePlaybackState()
+    }
+}
+
+extension PlayerViewModel: @preconcurrency VLCMediaPlayerDelegate {
+    nonisolated func mediaPlayerStateChanged(
+        _ newState: VLCMediaPlayerState
+    ) {
+        Task { @MainActor [weak self] in
+            self?.handleMediaPlayerStateChanged(
+                newState
+            )
+        }
+    }
+
+    nonisolated func mediaPlayerTimeChanged(
+        _ aNotification: Notification
+    ) {
+        Task { @MainActor [weak self] in
+            self?.handleMediaPlayerTimeChanged()
+        }
+    }
+
+    nonisolated func mediaPlayerLengthChanged(
+        _ length: Int64
+    ) {
+        Task { @MainActor [weak self] in
+            self?.handleMediaPlayerLengthChanged(
+                length
+            )
+        }
     }
 }

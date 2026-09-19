@@ -1,6 +1,6 @@
 import SwiftUI
 import UIKit
-import VLCKit
+@preconcurrency import VLCKit
 
 struct VLCVideoView: UIViewRepresentable {
     @ObservedObject var player: PlayerViewModel
@@ -16,10 +16,6 @@ struct VLCVideoView: UIViewRepresentable {
 
         context.coordinator.hostView = view
         player.attach(to: context.coordinator)
-
-        DispatchQueue.main.async {
-            player.updateDrawableSize(view.bounds.size)
-        }
 
         return view
     }

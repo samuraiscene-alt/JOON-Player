@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 44 — Phase 43 기능 + 임시 파일·리소스 정리
+Phase 45 — Phase 44 기능 + Xcode 컴파일 사전 점검
 
 현재 포함된 기능:
 
@@ -99,6 +99,10 @@ Phase 44 — Phase 43 기능 + 임시 파일·리소스 정리
 - 자르기/복구 화면 이탈 시 남아 있는 작업 Task 취소 및 결과 파일 정리
 - AVFoundation 빠른/정확 자르기 실패·취소 시 부분 출력 파일 즉시 삭제
 - 영상/자막 security-scoped 접근 해제 경로를 공통 함수로 통합
+- VLCKit 4.0.0a24 실제 podspec 소스 스냅샷에서 사용 API 존재 여부 검증
+- Swift 6에서 @MainActor deinit의 actor-isolated 메서드 호출 컴파일 위험 제거
+- VLCKit delegate 콜백을 nonisolated → MainActor hop 구조로 변경
+- 플레이어 브리지의 VLCKit import를 @preconcurrency로 명시
 - 외부 SRT 자막 직접 선택
 - 영상과 동일한 파일명의 SRT 자동 연결 시도
 - 자막 싱크 -10초 ~ +10초 조절
@@ -186,6 +190,17 @@ Phase 44 — Phase 43 기능 + 임시 파일·리소스 정리
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## Xcode 컴파일 사전 점검
+
+실제 Xcode 프로젝트를 만들기 전에 Swift 6 동시성과 VLCKit API 호환성을 정적 점검했습니다.
+
+- 현재 Podfile의 **VLCKit 4.0.0a24**가 VideoLAN 저장소의 실제 podspec 버전과 일치하는 것을 확인했습니다.
+- 해당 소스 스냅샷에서 프레임 이동, 스크린샷, 오디오 딜레이/출력, EQ, 트랙, 챕터, PiP에 필요한 공개 API가 존재하는 것을 확인했습니다.
+- VLCKit delegate는 콜백 스레드를 main으로 가정하지 않고 `nonisolated` witness에서 `MainActor`로 넘겨 UI/Published 상태를 수정합니다.
+- Swift 6 strict concurrency에서 일반 `deinit`이 main-actor 메서드를 직접 부를 수 없는 문제를 제거했습니다.
+- 상세 점검 기록은 `Docs/PreXcode-Compile-Preflight.md`에 정리했습니다.
+- 아직 저장소에 실제 Xcode 프로젝트가 없으므로 **컴파일 성공을 확정한 단계는 아닙니다.** 최종 판정은 Mac/Xcode에서 진행합니다.
 
 ## 임시 파일과 리소스 정리
 
@@ -673,9 +688,9 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. 실제 Xcode 프로젝트 생성 전 컴파일 위험 API와 Swift 동시성 경고 사전 점검
-2. Mac/Xcode 실기기 빌드 시 임시 파일 정리·설정 복원·퀵 액션·VoiceOver·Dynamic Type·외장 키보드·빠른 설정·사용자 EQ·전체 제스처 동작 검증
-3. 실기기에서 자르기/복구 속도·용량·호환성 비교 후 기본값 미세 조정
+1. 실제 Xcode 프로젝트 생성 전에 파일 구조와 빌드 포함 대상 목록을 최종 정리
+2. Mac/Xcode에서 프로젝트 생성 후 첫 컴파일 오류를 순서대로 제거
+3. 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
 
 ## 설계 원칙
 

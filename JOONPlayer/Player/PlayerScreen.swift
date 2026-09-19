@@ -1660,7 +1660,7 @@ private final class HardwareKeyboardResponderView: UIView {
         if shortcutsEnabled {
             guard window != nil else { return }
 
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 guard
                     let self,
                     self.shortcutsEnabled,
