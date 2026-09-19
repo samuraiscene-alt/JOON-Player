@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 48 — Phase 47 기능 + 재현 가능한 Xcode 프로젝트 생성
+Phase 49 — Phase 48 기능 + Mac 환경 프로젝트 연속성 관리
 
 현재 포함된 기능:
 
@@ -197,6 +197,17 @@ Phase 48 — Phase 47 기능 + 재현 가능한 Xcode 프로젝트 생성
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## Mac 환경 연속성 관리
+
+iPhone에서 진행한 현재 프로젝트를 나중에 Mac에서 새로 만들지 않고 그대로 이어서 작업할 수 있도록 관리 문서를 추가했습니다.
+
+- `Docs/JOON-Player-Mac-Continuity.md`: JOON Player 전용 Mac 재개 기준
+- `Docs/Mac-Project-Registry.md`: 지금까지 진행한 주요 앱들의 소스 위치 / backend / Mac 재개 상태 목록
+- `Docs/Project-Backup-Policy.md`: GitHub 원본 관리, secret 제외, 개발 중/최종 handoff 구분 원칙
+- JOON Player의 실제 원본은 항상 GitHub `main`이며, Mac에서는 clone/pull 후 기존 코드에서 이어서 작업합니다.
+- 다른 앱의 코드를 JOON Player repository에 복사하지 않고 각 앱 repository를 독립적으로 유지합니다.
+- 현재 GitHub connector에서 접근이 확인되지 않는 프로젝트는 repository 이름을 추측해서 새로 만들지 않고 Registry에 **재확인 필요**로 표시했습니다.
 
 ## 재현 가능한 Xcode 프로젝트 생성
 
@@ -731,9 +742,10 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. Mac에서 `brew install xcodegen` 후 `./Scripts/generate-xcode-project.sh` 실행
-2. `pod install` 후 `./Scripts/check-xcode-readiness.sh --build`로 첫 Simulator 컴파일
-3. Simulator 성공 뒤 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
+1. 현재 상태는 GitHub + Mac continuity 문서 기준으로 보존
+2. Mac이 준비되면 `Docs/JOON-Player-Mac-Continuity.md` 순서대로 clone → XcodeGen → CocoaPods → 첫 compile
+3. 첫 Simulator compile 오류를 순서대로 제거
+4. Simulator 성공 뒤 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
 
 ## 설계 원칙
 
