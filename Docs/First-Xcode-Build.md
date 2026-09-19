@@ -20,15 +20,28 @@ GitHub에서 `samuraiscene-alt/JOON-Player` 저장소를 Mac에 clone 한다.
 
 ## 2. Xcode 프로젝트 생성
 
-`Docs/Xcode-Project-Setup.md`의 값으로 iOS App 프로젝트를 만든다.
+우선 **자동 생성 방식**을 사용한다.
 
-반드시 Product Name은 `JOONPlayer`, Interface는 SwiftUI, Language는 Swift, Deployment Target은 iOS 17.0 이상, 지원 기기는 iPhone + iPad로 맞춘다.
+XcodeGen을 설치한 뒤 저장소 루트에서:
 
-Xcode가 만든 기본 `ContentView.swift`와 앱 entry 파일은 저장소의 기존 파일과 중복되지 않게 제거한 뒤 기존 `JOONPlayer/App` 파일을 target에 넣는다.
+```bash
+brew install xcodegen
+./Scripts/generate-xcode-project.sh
+```
+
+를 실행한다.
+
+이 스크립트는 저장소의 `project.yml`을 기준으로 `JOONPlayer.xcodeproj`를 만든다. target 이름, iOS 17.0, iPhone+iPad, 소스 폴더, Info.plist, Background Audio/PiP용 `UIBackgroundModes`, shared scheme이 같은 기준으로 반복 생성된다.
+
+Bundle Identifier는 첫 Simulator 빌드를 위한 임시 기본값 `com.joonplayer.app`으로 둔다. 실제 iPhone에 설치할 때 Apple Developer 계정에 맞는 고유 Bundle Identifier로 바꾼다.
+
+XcodeGen을 쓰지 못하는 경우에만 `Docs/Xcode-Project-Setup.md`의 수동 생성 절차를 사용한다.
 
 ## 3. Source Manifest 대조
 
-Xcode의 **Build Phases → Compile Sources**에서 `Docs/Xcode-Source-Manifest.txt`에 적힌 Swift **23개**가 모두 보이는지 확인한다. 한 파일도 빠지거나 두 번 들어가면 안 된다.
+XcodeGen은 `JOONPlayer` 폴더를 앱 target source로 추가한다.
+
+생성 후 Xcode의 **Build Phases → Compile Sources**에서 `Docs/Xcode-Source-Manifest.txt`에 적힌 Swift **23개**가 모두 보이는지 확인한다. 한 파일도 빠지거나 두 번 들어가면 안 된다.
 
 ## 4. VLCKit 설치
 

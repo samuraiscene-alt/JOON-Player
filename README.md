@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 47 — Phase 46 기능 + 첫 Xcode 빌드 자동 점검
+Phase 48 — Phase 47 기능 + 재현 가능한 Xcode 프로젝트 생성
 
 현재 포함된 기능:
 
@@ -108,6 +108,8 @@ Phase 47 — Phase 46 기능 + 첫 Xcode 빌드 자동 점검
 - 첫 컴파일은 VLCKit만 연결하고 FFmpegKitNext는 후속 연결하도록 빌드 순서 확정
 - Mac에서 Xcode/CocoaPods/소스 23개/Podfile/VLCKit pin을 자동 확인하는 readiness 스크립트 추가
 - workspace 생성 후 동일 스크립트의 --build 옵션으로 첫 Simulator 컴파일 실행 경로 준비
+- project.yml + XcodeGen으로 JOONPlayer.xcodeproj를 동일 설정으로 반복 생성하는 경로 추가
+- 자동 생성 프로젝트에 iOS 17 / iPhone+iPad / Info.plist / UIBackgroundModes / shared scheme 기준 고정
 - 외부 SRT 자막 직접 선택
 - 영상과 동일한 파일명의 SRT 자동 연결 시도
 - 자막 싱크 -10초 ~ +10초 조절
@@ -195,6 +197,18 @@ Phase 47 — Phase 46 기능 + 첫 Xcode 빌드 자동 점검
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## 재현 가능한 Xcode 프로젝트 생성
+
+Mac에서 Xcode 프로젝트를 매번 수동으로 클릭해 만드는 대신 저장소 루트의 `project.yml`을 기준으로 XcodeGen이 같은 `JOONPlayer.xcodeproj`를 만들 수 있게 준비했습니다.
+
+- `Scripts/generate-xcode-project.sh`가 XcodeGen 설치 여부를 확인한 뒤 프로젝트를 생성합니다.
+- iOS 17.0, iPhone+iPad, `JOONPlayer` target, shared `JOONPlayer` scheme을 고정합니다.
+- 저장소의 `JOONPlayer` 폴더 전체를 앱 source로 사용하므로 현재 Swift 23개가 자동으로 포함됩니다.
+- XcodeGen이 생성하는 `JOONPlayer/Supporting/Info.plist`는 Git에 커밋하지 않고 `project.yml`에서 매번 재생성합니다.
+- Info.plist에는 세로/가로 방향, iPad 방향, 간접 입력 지원, PiP/백그라운드 오디오에 필요한 `UIBackgroundModes = audio`를 포함합니다.
+- 첫 Simulator용 Bundle Identifier는 `com.joonplayer.app`이며 실제 실기기 서명 단계에서 고유 값으로 변경합니다.
+- 생성 후에는 기존 순서대로 `pod install` → `JOONPlayer.xcworkspace` → readiness build로 진행합니다.
 
 ## 첫 Xcode 빌드 자동 점검
 
@@ -717,8 +731,8 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. Mac/Xcode가 준비되면 `Docs/First-Xcode-Build.md` 순서대로 실제 프로젝트 생성 및 readiness 검사
-2. `./Scripts/check-xcode-readiness.sh --build`로 첫 Simulator 컴파일 후 오류를 순서대로 제거
+1. Mac에서 `brew install xcodegen` 후 `./Scripts/generate-xcode-project.sh` 실행
+2. `pod install` 후 `./Scripts/check-xcode-readiness.sh --build`로 첫 Simulator 컴파일
 3. Simulator 성공 뒤 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
 
 ## 설계 원칙

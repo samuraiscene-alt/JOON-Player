@@ -1,0 +1,54 @@
+name: JOONPlayer
+
+options:
+  minimumXcodeGenVersion: 2.46.0
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "17.0"
+
+configs:
+  Debug: debug
+  Release: release
+
+settings:
+  base:
+    SWIFT_STRICT_CONCURRENCY: complete
+
+targets:
+  JOONPlayer:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: JOONPlayer
+        excludes:
+          - Supporting/Info.plist
+    info:
+      path: JOONPlayer/Supporting/Info.plist
+      properties:
+        CFBundleDisplayName: JOON Player
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIBackgroundModes:
+          - audio
+        UIApplicationSupportsIndirectInputEvents: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.joonplayer.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+
+schemes:
+  JOONPlayer:
+    build:
+      targets:
+        JOONPlayer: all
+    run:
+      config: Debug
