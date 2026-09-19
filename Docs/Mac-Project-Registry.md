@@ -4,6 +4,14 @@ Checked: 2026-09-19
 
 이 문서는 iPhone 중심으로 진행한 앱들을 나중에 Mac 환경에서 다시 열어 이어서 작업하기 위한 **공통 프로젝트 목록**이다.
 
+## GitHub 작업 권한 상태
+
+- ChatGPT의 GitHub plugin permission은 **Allow all actions**로 확인됨.
+- 현재 설치 범위에서 실제 repository 쓰기까지 확인된 곳은 `samuraiscene-alt/JOON-Player`.
+- 다른 앱 repository가 안 보이는 원인은 ChatGPT의 쓰기 권한 부족이 아니라 GitHub App installation의 **Repository access 범위**로 판단됨.
+- 표준 설정과 검증 절차는 `Docs/GitHub-Repository-Access.md`를 기준으로 한다.
+- Repository access를 `All repositories`로 변경한 뒤 전체 앱 repository를 다시 조회해 이 Registry를 실제 상태로 갱신한다.
+
 원칙:
 - 각 앱의 실제 소스는 **각 앱의 GitHub 저장소가 원본(Source of Truth)** 이다.
 - 이 저장소에는 다른 앱의 소스 코드를 복사해 섞지 않는다.

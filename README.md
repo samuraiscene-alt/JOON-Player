@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 49 — Phase 48 기능 + Mac 환경 프로젝트 연속성 관리
+Phase 50 — Phase 49 기능 + GitHub 전체 프로젝트 쓰기 환경 표준화
 
 현재 포함된 기능:
 
@@ -197,6 +197,17 @@ Phase 49 — Phase 48 기능 + Mac 환경 프로젝트 연속성 관리
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## GitHub 전체 프로젝트 쓰기 환경
+
+앞으로 새 앱 개발과 기존 앱 수정 모두 ChatGPT가 GitHub repository에 실제 commit/push까지 할 수 있는 것을 기본 작업 방식으로 사용합니다.
+
+- ChatGPT의 GitHub plugin permission은 현재 **Allow all actions**로 확인했습니다.
+- JOON Player repository에서는 실제 `push: true`와 commit/push 성공까지 확인했습니다.
+- 현재 다른 repository가 보이지 않는 제한은 GitHub App installation의 repository 선택 범위 때문입니다.
+- 개인 계정의 GitHub App Repository access를 **All repositories**로 바꾼 뒤 기존 앱 repository 전체를 다시 조회합니다.
+- 이후 모든 작업은 **repository 확인 → push 권한 확인 → 코드 수정 → commit → commit 재조회 검증** 순서로 수행합니다.
+- 자세한 기준은 `Docs/GitHub-Repository-Access.md`에 고정했습니다.
 
 ## Mac 환경 연속성 관리
 
