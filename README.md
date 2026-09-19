@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 46 — Phase 45 기능 + Xcode 프로젝트 구성 확정
+Phase 47 — Phase 46 기능 + 첫 Xcode 빌드 자동 점검
 
 현재 포함된 기능:
 
@@ -106,6 +106,8 @@ Phase 46 — Phase 45 기능 + Xcode 프로젝트 구성 확정
 - Xcode 앱 target에 포함할 Swift 소스 23개를 고정 목록으로 작성
 - 기존 App / Editing / File / Player / Settings 폴더 구조를 Xcode 그룹 구조로 확정
 - 첫 컴파일은 VLCKit만 연결하고 FFmpegKitNext는 후속 연결하도록 빌드 순서 확정
+- Mac에서 Xcode/CocoaPods/소스 23개/Podfile/VLCKit pin을 자동 확인하는 readiness 스크립트 추가
+- workspace 생성 후 동일 스크립트의 --build 옵션으로 첫 Simulator 컴파일 실행 경로 준비
 - 외부 SRT 자막 직접 선택
 - 영상과 동일한 파일명의 SRT 자동 연결 시도
 - 자막 싱크 -10초 ~ +10초 조절
@@ -193,6 +195,18 @@ Phase 46 — Phase 45 기능 + Xcode 프로젝트 구성 확정
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## 첫 Xcode 빌드 자동 점검
+
+Mac을 준비한 뒤 수동으로 하나씩 확인하지 않아도 되도록 `Scripts/check-xcode-readiness.sh`를 추가했습니다.
+
+- macOS / Xcode command line tools / `xcodebuild` / CocoaPods 상태를 확인합니다.
+- `Docs/Xcode-Source-Manifest.txt`의 Swift 23개가 실제로 모두 존재하는지 확인합니다.
+- 현재 `Podfile`의 target이 `JOONPlayer`인지, VLCKit이 `4.0.0a24`로 고정됐는지 확인합니다.
+- Xcode 프로젝트와 CocoaPods workspace 생성 여부를 단계에 맞게 안내합니다.
+- workspace 생성 후 `./Scripts/check-xcode-readiness.sh --build`를 실행하면 code signing 없이 generic iOS Simulator 첫 컴파일을 시도합니다.
+- 실제 Mac에서의 처음부터 첫 빌드까지 순서는 `Docs/First-Xcode-Build.md`에 별도로 정리했습니다.
+- 이 스크립트는 환경을 자동 설치하거나 프로젝트를 임의 변경하지 않고 **검사와 빌드 시도만** 합니다.
 
 ## Xcode 프로젝트 구성 기준
 
@@ -703,9 +717,9 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. Mac/Xcode가 준비되면 `Docs/Xcode-Project-Setup.md` 기준으로 실제 프로젝트 생성
-2. 첫 컴파일 오류를 순서대로 제거하고 VLCKit/Swift concurrency importer 차이를 확정
-3. 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
+1. Mac/Xcode가 준비되면 `Docs/First-Xcode-Build.md` 순서대로 실제 프로젝트 생성 및 readiness 검사
+2. `./Scripts/check-xcode-readiness.sh --build`로 첫 Simulator 컴파일 후 오류를 순서대로 제거
+3. Simulator 성공 뒤 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
 
 ## 설계 원칙
 
