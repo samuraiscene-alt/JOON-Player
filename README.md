@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 45 — Phase 44 기능 + Xcode 컴파일 사전 점검
+Phase 46 — Phase 45 기능 + Xcode 프로젝트 구성 확정
 
 현재 포함된 기능:
 
@@ -103,6 +103,9 @@ Phase 45 — Phase 44 기능 + Xcode 컴파일 사전 점검
 - Swift 6에서 @MainActor deinit의 actor-isolated 메서드 호출 컴파일 위험 제거
 - VLCKit delegate 콜백을 nonisolated → MainActor hop 구조로 변경
 - 플레이어 브리지의 VLCKit import를 @preconcurrency로 명시
+- Xcode 앱 target에 포함할 Swift 소스 23개를 고정 목록으로 작성
+- 기존 App / Editing / File / Player / Settings 폴더 구조를 Xcode 그룹 구조로 확정
+- 첫 컴파일은 VLCKit만 연결하고 FFmpegKitNext는 후속 연결하도록 빌드 순서 확정
 - 외부 SRT 자막 직접 선택
 - 영상과 동일한 파일명의 SRT 자동 연결 시도
 - 자막 싱크 -10초 ~ +10초 조절
@@ -190,6 +193,18 @@ Phase 45 — Phase 44 기능 + Xcode 컴파일 사전 점검
 - 마지막 남은 영상을 삭제하면 빈 저장 목록은 자동으로 함께 제거됩니다.
 - 이름 변경 시 다른 저장 목록과 같은 이름은 허용하지 않습니다.
 - 저장 목록이나 항목을 삭제해도 원본 영상 파일은 삭제되지 않습니다.
+
+## Xcode 프로젝트 구성 기준
+
+Mac/Xcode 단계에서 파일을 빠뜨리거나 중복 추가하지 않도록 프로젝트 구성을 확정했습니다.
+
+- Xcode Product/Target 이름은 **JOONPlayer**로 유지해 기존 Podfile target과 일치시킵니다.
+- 현재 저장소의 Swift 소스는 **23개**이며 모두 JOONPlayer 앱 target에 포함합니다.
+- 현재 **App / Editing / File / Player / Settings** 폴더 구조는 그대로 유지합니다.
+- `README.md`, `Docs/*`, `Podfile`, `.gitignore`는 앱 target에 넣지 않습니다.
+- Xcode가 새로 만드는 중복 `ContentView.swift`와 앱 entry 파일 대신 저장소의 기존 파일을 사용합니다.
+- 첫 컴파일은 **VLCKit 4.0.0a24**까지만 연결하고 FFmpegKitNext는 기본 빌드가 안정된 후 연결합니다.
+- 정확한 프로젝트 생성 절차는 `Docs/Xcode-Project-Setup.md`, target membership 기준은 `Docs/Xcode-Source-Manifest.txt`에 고정했습니다.
 
 ## Xcode 컴파일 사전 점검
 
@@ -688,8 +703,8 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. 실제 Xcode 프로젝트 생성 전에 파일 구조와 빌드 포함 대상 목록을 최종 정리
-2. Mac/Xcode에서 프로젝트 생성 후 첫 컴파일 오류를 순서대로 제거
+1. Mac/Xcode가 준비되면 `Docs/Xcode-Project-Setup.md` 기준으로 실제 프로젝트 생성
+2. 첫 컴파일 오류를 순서대로 제거하고 VLCKit/Swift concurrency importer 차이를 확정
 3. 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
 
 ## 설계 원칙

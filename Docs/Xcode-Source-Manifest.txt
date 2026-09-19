@@ -1,0 +1,41 @@
+# JOON Player Xcode Source Manifest
+# Checked: 2026-09-19
+# App target: JOONPlayer
+# Minimum iOS: 17.0
+# Swift source count: 23
+#
+# Every path below must have JOONPlayer target membership enabled.
+
+JOONPlayer/App/ContentView.swift
+JOONPlayer/App/JOONPlayerApp.swift
+
+JOONPlayer/Editing/AdvancedVideoTrimService.swift
+JOONPlayer/Editing/FFmpegFailureSummary.swift
+JOONPlayer/Editing/FFmpegKitNextRuntime.swift
+JOONPlayer/Editing/PreciseVideoTrimService.swift
+JOONPlayer/Editing/TrimEditorView.swift
+JOONPlayer/Editing/VideoRepairService.swift
+JOONPlayer/Editing/VideoRepairView.swift
+
+JOONPlayer/File/RecentMediaStore.swift
+JOONPlayer/File/SavedPlaylistStore.swift
+JOONPlayer/File/SupportedVideoTypes.swift
+
+JOONPlayer/Player/MediaInfoView.swift
+JOONPlayer/Player/PlaybackControls.swift
+JOONPlayer/Player/PlaybackQueueView.swift
+JOONPlayer/Player/PlaybackResumeStore.swift
+JOONPlayer/Player/PlayerQuickAction.swift
+JOONPlayer/Player/PlayerScreen.swift
+JOONPlayer/Player/PlayerViewModel.swift
+JOONPlayer/Player/SavedPlaylistManageView.swift
+JOONPlayer/Player/VLCVideoView.swift
+JOONPlayer/Player/VolumePopup.swift
+
+JOONPlayer/Settings/QuickSettingsPanel.swift
+
+# Do NOT enable app target membership for:
+# README.md
+# Docs/*
+# Podfile
+# .gitignore
