@@ -539,14 +539,25 @@
     updateNavigation();
   }
 
+  function showLockedIndicator() {
+    if (!state.locked) return;
+    clearTimeout(state.lockHintTimer);
+    e.unlock.hidden = false;
+    state.lockHintTimer = setTimeout(() => {
+      if (state.locked) e.unlock.hidden = true;
+    }, 3000);
+  }
+
   function setLocked(value) {
     state.locked = value;
-    e.unlock.hidden = !value;
+    clearTimeout(state.lockHintTimer);
 
     if (value) {
       e.controls.classList.add("hide");
+      showLockedIndicator();
       showToast("컨트롤을 잠갔어.");
     } else {
+      e.unlock.hidden = true;
       showControls(true);
       scheduleHide();
     }
@@ -582,7 +593,11 @@
     }
 
     e.gesture.addEventListener("pointerdown", (event) => {
-      if (state.locked) return;
+      if (state.locked) {
+        if (event.cancelable) event.preventDefault();
+        showLockedIndicator();
+        return;
+      }
       if (event.cancelable) event.preventDefault();
 
       try {
