@@ -1,0 +1,36 @@
+name: JOON Player Web Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Web/**"
+      - ".github/workflows/web-smoke.yml"
+  pull_request:
+    paths:
+      - "Web/**"
+      - ".github/workflows/web-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: node --check Web/app.js
+
+      - name: Validate manifest
+        run: python -m json.tool Web/manifest.webmanifest > /dev/null
+
+      - name: Verify required files
+        run: |
+          test -f Web/index.html
+          test -f Web/app.js
+          test -f Web/manifest.webmanifest
+          test -f Web/sw.js
+          test -f Web/icon.svg
