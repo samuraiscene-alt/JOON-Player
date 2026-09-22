@@ -1,4 +1,4 @@
-const CACHE = "joon-player-web-v1";
+const CACHE = "joon-player-web-v2";
 const SHELL = [
   "./",
   "./index.html",
@@ -33,14 +33,14 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        }
         return response;
-      });
-    })
+      })
+      .catch(() => caches.match(event.request))
   );
 });
