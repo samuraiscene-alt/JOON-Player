@@ -468,27 +468,27 @@
     }
   }
 
-  async function toggleFullscreen() {
+  async function setWebFullscreen(value) {
+    const enabled = Boolean(value);
+    e.stage.classList.toggle("web-fullscreen", enabled);
+    document.body.classList.toggle("player-fullscreen", enabled);
+    e.full.setAttribute("aria-label", enabled ? "전체화면 종료" : "전체화면");
+    showControls(true);
+    scheduleHide();
+
     try {
-      if (document.fullscreenElement) {
-        await document.exitFullscreen();
-        return;
+      if (screen.orientation) {
+        if (enabled && screen.orientation.lock) {
+          await screen.orientation.lock("landscape");
+        } else if (!enabled && screen.orientation.unlock) {
+          screen.orientation.unlock();
+        }
       }
+    } catch {}
+  }
 
-      if (e.stage.requestFullscreen) {
-        await e.stage.requestFullscreen();
-        return;
-      }
-
-      if (e.video.webkitEnterFullscreen) {
-        e.video.webkitEnterFullscreen();
-        return;
-      }
-
-      showToast("이 Safari에서는 웹 전체화면 전환을 지원하지 않아.");
-    } catch {
-      showToast("전체화면 전환에 실패했어.");
-    }
+  function toggleFullscreen() {
+    setWebFullscreen(!e.stage.classList.contains("web-fullscreen"));
   }
 
   function cycleRepeat() {
@@ -681,6 +681,7 @@
 
   e.back.addEventListener("click", () => {
     persistResume(true);
+    setWebFullscreen(false);
     e.video.pause();
     e.player.hidden = true;
     e.home.hidden = false;
@@ -710,7 +711,8 @@
 
   e.mute.addEventListener("click", () => {
     e.video.muted = !e.video.muted;
-    e.mute.textContent = e.video.muted ? "🔇" : "🔊";
+    e.mute.classList.toggle("muted", e.video.muted);
+    e.mute.setAttribute("aria-label", e.video.muted ? "음소거 해제" : "음소거");
   });
 
   e.full.addEventListener("click", toggleFullscreen);
