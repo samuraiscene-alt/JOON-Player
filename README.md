@@ -4,7 +4,7 @@ JOON Player는 iPhone / iPad 중심의 개인용 동영상 플레이어 프로�
 
 ## 현재 개발 단계
 
-Phase 51 — Phase 50 기능 + 전체 앱 GitHub 쓰기 권한 검증 완료
+Phase 52 — Native 보존 + Web/PWA 1차 실행 버전 병행
 
 현재 포함된 기능:
 
@@ -768,10 +768,10 @@ iCloud Drive나 외부 파일 제공자의 권한 정책 때문에 같은 폴더
 
 ## 다음 개발 순서
 
-1. 현재 상태는 GitHub + Mac continuity 문서 기준으로 보존
-2. Mac이 준비되면 `Docs/JOON-Player-Mac-Continuity.md` 순서대로 clone → XcodeGen → CocoaPods → 첫 compile
-3. 첫 Simulator compile 오류를 순서대로 제거
-4. Simulator 성공 뒤 실기기에서 재생·PiP·자막·제스처·자르기·복구를 통합 검증
+1. `Web/` PWA를 정적 배포해 iPhone Safari에서 실제 재생 테스트
+2. MP4/H.264/AAC 기준으로 제스처·SRT·전체화면·PiP 가능 범위를 실기기에서 튜닝
+3. 웹에서 불가능하거나 불안정한 기능은 `Docs/Web-Native-Roadmap.md`의 Native backlog로 유지
+4. Mac이 준비되면 기존 `JOONPlayer/` 코드를 그대로 이어서 Xcode/VLCKit/FFmpeg 기능 재개
 
 ## 설계 원칙
 
