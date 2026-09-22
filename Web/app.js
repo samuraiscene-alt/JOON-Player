@@ -553,6 +553,11 @@
   function setupGestures() {
     e.gesture.addEventListener("pointerdown", (event) => {
       if (state.locked) return;
+      if (event.cancelable) event.preventDefault();
+
+      try {
+        e.gesture.setPointerCapture(event.pointerId);
+      } catch {}
 
       state.gesture = {
         id: event.pointerId,
@@ -651,6 +656,12 @@
           }, 300);
         }
       }
+
+      try {
+        if (e.gesture.hasPointerCapture && e.gesture.hasPointerCapture(event.pointerId)) {
+          e.gesture.releasePointerCapture(event.pointerId);
+        }
+      } catch {}
 
       state.gesture = null;
     }
