@@ -40,7 +40,7 @@
     <div class="home-logo">▶</div><h1>내 영상 바로 재생</h1>
     <p>파일 앱에서 고른 동영상을 서버에 올리지 않고 이 기기에서 바로 재생해.</p>
     <button id="openMain" class="primary">동영상 선택</button>
-    <p style="font-size:12px">웹 버전은 MP4/H.264/AAC를 우선 지원하고, MKV 등은 Safari가 내부 코덱을 지원할 때만 재생돼.</p>
+    <p style="font-size:12px">현재 Web 버전은 MP4 / M4V / MOV 동영상만 선택할 수 있어.</p>
   </section>
   <section id="player" hidden>
     <div id="stage" class="stage" data-fit="contain">
@@ -73,7 +73,7 @@
   </aside>
   <aside id="queue" class="sheet" hidden><div class="handle"></div><div class="sheet-head"><strong>재생 목록</strong><button data-close="queue" class="icon">✕</button></div><div class="tools"><button id="repeat">반복 끔</button><button id="shuffle">셔플 끔</button><button id="add">파일 추가</button></div><ol id="list" class="list"></ol></aside>
   <div id="toast" class="toast" hidden></div>
-  <input id="videos" type="file" accept="video/*,.mp4,.m4v,.mov,.webm,.mkv,.avi,.ts,.m2ts,.flv" multiple hidden>
+  <input id="videos" type="file" accept=".mp4,.m4v,.mov,video/mp4,video/quicktime" multiple hidden>
 </main>
 <script src="./app.js" defer></script>
 </body></html>
