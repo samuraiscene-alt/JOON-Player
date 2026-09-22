@@ -1,0 +1,19 @@
+{
+  "name": "JOON Player",
+  "short_name": "JOON Player",
+  "description": "iPhone/iPad 로컬 동영상 재생용 JOON Player 웹앱",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#05070b",
+  "theme_color": "#05070b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
