@@ -807,26 +807,39 @@
     );
   });
 
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) return;
+  function isPiPActive() {
+    return Boolean(
+      document.pictureInPictureElement ||
+      (
+        e.video.webkitPresentationMode &&
+        e.video.webkitPresentationMode === "picture-in-picture"
+      )
+    );
+  }
 
+  function pauseForBackground() {
     persistResume(true);
 
-    const standardPiP = Boolean(document.pictureInPictureElement);
-    const webkitPiP = Boolean(
-      e.video.webkitPresentationMode &&
-      e.video.webkitPresentationMode === "picture-in-picture"
-    );
-
-    if (!standardPiP && !webkitPiP && !e.video.paused) {
+    if (!isPiPActive() && !e.video.paused) {
       e.video.pause();
     }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) pauseForBackground();
   });
 
-  window.addEventListener("pagehide", () => {
-    persistResume(true);
-    revokeObjectURL();
+  window.addEventListener("pagehide", pauseForBackground);
+
+  window.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (document.hidden || !document.hasFocus()) {
+        pauseForBackground();
+      }
+    }, 120);
   });
+
+  document.addEventListener("freeze", pauseForBackground);
 
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input,select")) return;
