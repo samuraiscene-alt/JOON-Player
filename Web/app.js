@@ -640,7 +640,7 @@
         state.temporaryRate = null;
       }
 
-      if (!g.moved) {
+      if (!g.moved && g.mode !== "hold") {
         const now = Date.now();
 
         if (now - state.lastTapAt < 320) {
@@ -649,11 +649,14 @@
           seekBy(g.lastX < innerWidth / 2 ? -10 : 10);
         } else {
           state.lastTapAt = now;
-          state.tapTimer = setTimeout(() => {
-            if (e.controls.classList.contains("hide")) showControls(false);
-            else hideControls();
+
+          if (e.controls.classList.contains("hide")) {
+            showControls(false);
             scheduleHide();
-          }, 300);
+          } else {
+            clearTimeout(state.hideTimer);
+            hideControls();
+          }
         }
       }
 
