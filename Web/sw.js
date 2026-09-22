@@ -1,4 +1,4 @@
-const CACHE = "joon-player-web-v2";
+const CACHE = "joon-player-web-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,7 +10,18 @@ const SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(SHELL))
+      .then(async (cache) => {
+        const responses = await Promise.all(
+          SHELL.map((url) => fetch(url, { cache: "no-store" }))
+        );
+
+        await Promise.all(
+          responses.map((response, index) => {
+            if (!response || !response.ok) return Promise.resolve();
+            return cache.put(SHELL[index], response.clone());
+          })
+        );
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -26,6 +37,12 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
@@ -33,7 +50,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then((response) => {
         if (response && response.ok) {
           const copy = response.clone();
