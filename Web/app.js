@@ -808,7 +808,19 @@
   });
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) persistResume(true);
+    if (!document.hidden) return;
+
+    persistResume(true);
+
+    const standardPiP = Boolean(document.pictureInPictureElement);
+    const webkitPiP = Boolean(
+      e.video.webkitPresentationMode &&
+      e.video.webkitPresentationMode === "picture-in-picture"
+    );
+
+    if (!standardPiP && !webkitPiP && !e.video.paused) {
+      e.video.pause();
+    }
   });
 
   window.addEventListener("pagehide", () => {
