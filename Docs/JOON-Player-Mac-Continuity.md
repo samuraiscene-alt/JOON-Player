@@ -15,7 +15,8 @@ Checked: 2026-09-19
 
 ```text
 JOON-Player/
-├─ JOONPlayer/
+├─ Web/           # Mac 없이 우선 완성하는 PWA
+├─ JOONPlayer/    # 보존된 Native Swift/iOS 구현
 │  ├─ App/
 │  ├─ Editing/
 │  ├─ File/
@@ -120,3 +121,19 @@ Simulator compile 성공 뒤 iPhone/iPad에서:
 - `.xcworkspace`는 현재 gitignore 정책을 유지한다.
 - 기능 단위 수정마다 commit을 남긴다.
 - 최종 완성 단계에서만 `JOON_PLAYER_FINAL_HANDOFF.md`를 만든다.
+
+
+## Web → Mac 전환 원칙
+
+Web/PWA 개발을 진행하는 동안 Native 코드는 삭제하거나 웹 코드로 덮어쓰지 않는다.
+
+웹에서 먼저 검증한 다음 항목은 Mac/Xcode 단계에서 기존 Swift 구조에 반영할 수 있다.
+
+- 화면 배치
+- 제스처 정책
+- 재생 컨트롤 UX
+- 자막 조절 UX
+- 재생 목록 UX
+- 설정 기본값
+
+브라우저 한계 때문에 웹에서 구현하지 못한 항목은 `Docs/Web-Native-Roadmap.md`의 Native backlog를 기준으로 계속 개발한다.
