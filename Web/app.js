@@ -137,6 +137,7 @@
     e.pos.textContent = String(state.index + 1) + " / " + String(state.items.length);
     e.home.hidden = true;
     e.player.hidden = false;
+    document.body.classList.add("player-active");
     e.notice.textContent = supportText(item.file);
 
     state.a = null;
@@ -207,6 +208,7 @@
       e.video.removeAttribute("src");
       e.player.hidden = true;
       e.home.hidden = false;
+      document.body.classList.remove("player-active");
       closeSheets();
       return;
     }
@@ -776,6 +778,7 @@
     e.video.pause();
     e.player.hidden = true;
     e.home.hidden = false;
+    document.body.classList.remove("player-active");
   });
 
   e.play.addEventListener("click", () => {
