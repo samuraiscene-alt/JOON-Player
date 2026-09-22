@@ -504,7 +504,7 @@
       ? "반복 끔"
       : state.repeat === "all"
         ? "전체 반복"
-        : "한 곡 반복";
+        : "현재 영상 반복";
 
     updateNavigation();
   }
