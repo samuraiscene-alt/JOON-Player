@@ -88,16 +88,13 @@
     state.objectURL = null;
   }
 
-  function supportText(file) {
-    if (/\.(mkv|avi|ts|m2ts|flv)$/i.test(file.name)) {
-      return "이 형식은 웹 Safari에서 제한될 수 있어. Native 버전에서는 VLCKit 지원을 유지해.";
-    }
-    return "내부 코덱을 Safari가 지원하면 바로 재생돼.";
+  function supportText() {
+    return "현재 Web 버전은 MP4 / M4V / MOV 동영상만 선택할 수 있어.";
   }
 
   function addFiles(fileList, replace) {
     const files = Array.from(fileList || []).filter((file) =>
-      file.type.startsWith("video/") || /\.(mp4|m4v|mov|webm|mkv|avi|ts|m2ts|flv)$/i.test(file.name)
+      /\.(mp4|m4v|mov)$/i.test(file.name)
     );
 
     if (!files.length) {
@@ -789,7 +786,7 @@
 
   e.video.addEventListener("error", () => {
     showToast(
-      "웹 Safari에서 지원하지 않는 컨테이너 또는 코덱이야. Native 버전 대상 기능으로 남겨둘게.",
+      "파일 확장자는 지원 대상이지만, 영상 내부 인코딩 방식이 iPhone Web 재생과 맞지 않아.",
       3200
     );
   });
