@@ -551,6 +551,34 @@
   }
 
   function setupGestures() {
+    const activePointers = new Map();
+    let pinch = null;
+    let suppressSingleUntilClear = false;
+
+    function restoreTemporaryRate() {
+      if (state.temporaryRate !== null) {
+        e.video.playbackRate = state.temporaryRate;
+        state.temporaryRate = null;
+      }
+    }
+
+    function pointerDistance() {
+      const points = Array.from(activePointers.values()).slice(0, 2);
+      if (points.length < 2) return 0;
+      return Math.hypot(
+        points[1].x - points[0].x,
+        points[1].y - points[0].y
+      );
+    }
+
+    function releasePointer(event) {
+      try {
+        if (e.gesture.hasPointerCapture && e.gesture.hasPointerCapture(event.pointerId)) {
+          e.gesture.releasePointerCapture(event.pointerId);
+        }
+      } catch {}
+    }
+
     e.gesture.addEventListener("pointerdown", (event) => {
       if (state.locked) return;
       if (event.cancelable) event.preventDefault();
@@ -558,6 +586,30 @@
       try {
         e.gesture.setPointerCapture(event.pointerId);
       } catch {}
+
+      activePointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      if (activePointers.size >= 2) {
+        clearTimeout(state.holdTimer);
+        restoreTemporaryRate();
+        clearTimeout(state.tapTimer);
+        state.lastTapAt = 0;
+        suppressSingleUntilClear = true;
+
+        if (state.gesture) {
+          state.gesture.moved = true;
+          state.gesture.mode = "pinch";
+        }
+
+        pinch = {
+          startDistance: Math.max(pointerDistance(), 1),
+          applied: null
+        };
+        return;
+      }
 
       state.gesture = {
         id: event.pointerId,
@@ -573,7 +625,7 @@
 
       clearTimeout(state.holdTimer);
       state.holdTimer = setTimeout(() => {
-        if (!state.gesture || state.gesture.moved || e.video.paused) return;
+        if (!state.gesture || state.gesture.moved || e.video.paused || activePointers.size !== 1) return;
         state.temporaryRate = e.video.playbackRate;
         e.video.playbackRate = 2;
         state.gesture.mode = "hold";
@@ -582,8 +634,35 @@
     });
 
     e.gesture.addEventListener("pointermove", (event) => {
+      if (!activePointers.has(event.pointerId)) return;
+      if (event.cancelable) event.preventDefault();
+
+      activePointers.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY
+      });
+
+      if (pinch && activePointers.size >= 2) {
+        clearTimeout(state.holdTimer);
+        restoreTemporaryRate();
+
+        const scale = pointerDistance() / pinch.startDistance;
+
+        if (scale >= 1.12 && pinch.applied !== "cover") {
+          setFit("cover", true);
+          pinch.applied = "cover";
+          showFeedback("화면 채우기");
+        } else if (scale <= 0.88 && pinch.applied !== "contain") {
+          setFit("contain", true);
+          pinch.applied = "contain";
+          showFeedback("원본 비율");
+        }
+
+        return;
+      }
+
       const g = state.gesture;
-      if (!g || g.id !== event.pointerId) return;
+      if (!g || g.id !== event.pointerId || suppressSingleUntilClear) return;
 
       const dx = event.clientX - g.startX;
       const dy = event.clientY - g.startY;
@@ -594,9 +673,8 @@
         g.moved = true;
         clearTimeout(state.holdTimer);
 
-        if (g.mode === "hold" && state.temporaryRate !== null) {
-          e.video.playbackRate = state.temporaryRate;
-          state.temporaryRate = null;
+        if (g.mode === "hold") {
+          restoreTemporaryRate();
         }
       }
 
@@ -622,10 +700,26 @@
     });
 
     function finishGesture(event) {
-      const g = state.gesture;
-      if (!g || g.id !== event.pointerId) return;
-
+      activePointers.delete(event.pointerId);
       clearTimeout(state.holdTimer);
+
+      if (suppressSingleUntilClear) {
+        restoreTemporaryRate();
+        releasePointer(event);
+
+        if (activePointers.size === 0) {
+          suppressSingleUntilClear = false;
+          pinch = null;
+          state.gesture = null;
+        }
+        return;
+      }
+
+      const g = state.gesture;
+      if (!g || g.id !== event.pointerId) {
+        releasePointer(event);
+        return;
+      }
 
       if (g.mode === "seek" && Number.isFinite(e.video.duration)) {
         e.video.currentTime = clamp(
@@ -635,9 +729,8 @@
         );
       }
 
-      if (g.mode === "hold" && state.temporaryRate !== null) {
-        e.video.playbackRate = state.temporaryRate;
-        state.temporaryRate = null;
+      if (g.mode === "hold") {
+        restoreTemporaryRate();
       }
 
       if (!g.moved && g.mode !== "hold") {
@@ -660,12 +753,7 @@
         }
       }
 
-      try {
-        if (e.gesture.hasPointerCapture && e.gesture.hasPointerCapture(event.pointerId)) {
-          e.gesture.releasePointerCapture(event.pointerId);
-        }
-      } catch {}
-
+      releasePointer(event);
       state.gesture = null;
     }
 
