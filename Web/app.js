@@ -310,6 +310,10 @@
       state.items = [];
       state.originalOrder = [];
       state.index = -1;
+      state.shuffle = false;
+      state.repeat = "off";
+      e.shuffle.textContent = "셔플 끔";
+      e.repeat.textContent = "반복 끔";
     }
 
     const existing = new Set(state.items.map((item) => duplicateKey(item.file)));
