@@ -904,23 +904,13 @@
     }
   }
 
-  async function setWebFullscreen(value) {
+  function setWebFullscreen(value) {
     const enabled = Boolean(value);
     e.stage.classList.toggle("web-fullscreen", enabled);
     document.body.classList.toggle("player-fullscreen", enabled);
     e.full.setAttribute("aria-label", enabled ? "전체화면 종료" : "전체화면");
     showControls(true);
     scheduleHide();
-
-    try {
-      if (screen.orientation) {
-        if (enabled && screen.orientation.lock) {
-          await screen.orientation.lock("landscape");
-        } else if (!enabled && screen.orientation.unlock) {
-          screen.orientation.unlock();
-        }
-      }
-    } catch {}
   }
 
   function toggleFullscreen() {
