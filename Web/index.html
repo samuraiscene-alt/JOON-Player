@@ -40,7 +40,7 @@
     <div class="home-logo">▶</div><h1>내 영상 바로 재생</h1>
     <p>파일 앱에서 고른 동영상을 서버에 올리지 않고 이 기기에서 바로 재생해.</p>
     <button id="openMain" class="primary">동영상 선택</button>
-    <p style="font-size:12px">현재 Web 버전은 MP4 / M4V / MOV 동영상만 선택할 수 있어.</p>
+    <p style="font-size:12px">MP4 / M4V / MOV 지원 · 영상과 같은 이름의 SRT를 함께 선택하면 자동 연결돼.</p>
   </section>
   <section id="player" hidden>
     <div id="stage" class="stage" data-fit="contain">
@@ -74,7 +74,7 @@
   <aside id="queue" class="sheet" hidden><div class="handle"></div><div class="sheet-head"><strong>재생 목록</strong><button data-close="queue" class="icon">✕</button></div><div class="tools"><button id="repeat">반복 끔</button><button id="shuffle">셔플 끔</button><button id="add">파일 추가</button></div><ol id="list" class="list"></ol></aside>
   <div id="toast" class="toast" hidden></div>
   <div id="errorModal" class="error-modal" hidden><div class="error-card"><h2>이 파일은 재생할 수 없습니다</h2><p id="errorText">파일이 손상되었거나 iPhone Web에서 지원하지 않는 영상·오디오 코덱일 수 있습니다.</p><button id="errorOk">확인</button></div></div>
-  <input id="videos" type="file" accept=".mp4,.m4v,.mov,video/mp4,video/quicktime" multiple hidden>
+  <input id="videos" type="file" accept=".mp4,.m4v,.mov,.srt,video/mp4,video/quicktime,text/plain" multiple hidden>
 </main>
 <script src="./app.js" defer></script>
 </body></html>
