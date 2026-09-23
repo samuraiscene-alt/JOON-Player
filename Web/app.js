@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","clearQueue","list","toast","errorModal","errorText","errorOk"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -1273,6 +1273,33 @@
 
   e.repeat.addEventListener("click", cycleRepeat);
   e.shuffle.addEventListener("click", toggleShuffle);
+
+  e.clearQueue.addEventListener("click", () => {
+    if (!state.items.length) return;
+    if (!window.confirm("재생 목록을 모두 비울까?")) return;
+
+    persistResume(true);
+    e.video.pause();
+    revokeObjectURL();
+
+    state.items = [];
+    state.originalOrder = [];
+    state.index = -1;
+    state.a = null;
+    state.b = null;
+    state.cues = [];
+
+    e.video.removeAttribute("src");
+    e.video.load();
+    e.subs.textContent = "";
+    e.list.innerHTML = "";
+    e.player.hidden = true;
+    e.home.hidden = false;
+    document.body.classList.remove("player-active");
+    closeSheets();
+    updateNavigation();
+    showToast("재생 목록을 비웠어.");
+  });
 
   e.video.addEventListener("timeupdate", updateTimeline);
   e.video.addEventListener("play", () => {
