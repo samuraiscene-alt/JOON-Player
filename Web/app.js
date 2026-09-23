@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","add","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","notice"];
+  const ids = ["home","player","videos","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","add","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","notice","errorModal","errorText","errorOk"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -913,10 +913,17 @@
   });
 
   e.video.addEventListener("error", () => {
-    showToast(
-      "파일 확장자는 지원 대상이지만, 영상 내부 인코딩 방식이 iPhone Web 재생과 맞지 않아.",
-      3200
-    );
+    e.video.pause();
+    const item = state.items[state.index];
+    e.errorText.textContent = item
+      ? '"' + item.file.name + '"\n파일이 손상되었거나 iPhone Web에서 지원하지 않는 영상·오디오 코덱일 수 있습니다.'
+      : '파일이 손상되었거나 iPhone Web에서 지원하지 않는 영상·오디오 코덱일 수 있습니다.';
+    e.errorModal.hidden = false;
+  });
+
+  e.errorOk.addEventListener("click", () => {
+    e.errorModal.hidden = true;
+    showControls(true);
   });
 
   function isPiPActive() {
