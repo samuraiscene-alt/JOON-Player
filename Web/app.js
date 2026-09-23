@@ -186,6 +186,32 @@
     });
   }
 
+  function attachSubtitlesToItems(subtitles, items) {
+    if (!subtitles.length || !items.length) return 0;
+
+    let matched = 0;
+    let currentMatched = null;
+    const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
+
+    items.forEach((item) => {
+      if (item.subtitleFile) return;
+
+      const subtitle = findSubtitleForVideo(item.file, subtitles);
+      if (!subtitle) return;
+
+      item.subtitleFile = subtitle;
+      matched += 1;
+
+      if (item.id === currentId) currentMatched = item;
+    });
+
+    if (currentMatched) {
+      loadSRT(currentMatched.subtitleFile, currentMatched.id, true);
+    }
+
+    return matched;
+  }
+
   function addFiles(fileList, replace) {
     const selected = Array.from(fileList || []);
     const candidates = selected
@@ -194,6 +220,16 @@
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
     if (!candidates.length) {
+      if (subtitles.length && state.items.length) {
+        const matched = attachSubtitlesToItems(subtitles, state.items);
+        showToast(
+          matched
+            ? "자막 " + String(matched) + "개 자동 연결"
+            : "연결할 자막을 찾지 못했어."
+        );
+        return;
+      }
+
       showToast("동영상 파일을 선택해줘.");
       return;
     }
@@ -221,6 +257,8 @@
     }));
 
     const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
+    const existingItems = state.items.slice();
+    const matchedExisting = attachSubtitlesToItems(subtitles, existingItems);
 
     state.items.push(...added);
     state.items.sort((a, b) => compareVideoFiles(a.file, b.file));
@@ -236,7 +274,7 @@
     if (state.index < 0) {
       playIndex(0, true);
     } else {
-      const matched = added.filter((item) => item.subtitleFile).length;
+      const matched = added.filter((item) => item.subtitleFile).length + matchedExisting;
       showToast(
         String(files.length) + "개 파일 추가" +
         (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "") +
