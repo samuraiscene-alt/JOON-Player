@@ -625,6 +625,32 @@
     showToast(String(minutes) + "분 뒤에 멈출게.");
   }
 
+  async function readSubtitleText(file) {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+
+    if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+      return new TextDecoder("utf-8").decode(bytes.subarray(3));
+    }
+
+    if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+      return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+    }
+
+    if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+      return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+    }
+
+    try {
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      try {
+        return new TextDecoder("euc-kr", { fatal: true }).decode(bytes);
+      } catch {
+        return new TextDecoder("utf-8").decode(bytes);
+      }
+    }
+  }
+
   function parseSRT(text) {
     return text.replace(/\r/g, "").trim().split(/\n{2,}/).map((block) => {
       const lines = block.split("\n");
@@ -647,8 +673,13 @@
 
   async function loadSRT(file, targetId, automatic) {
     try {
-      const cues = parseSRT(await file.text());
+      const cues = parseSRT(await readSubtitleText(file));
       if (targetId && state.items[state.index]?.id !== targetId) return;
+
+      if (!cues.length) {
+        showToast("자막 내용을 읽지 못했어.");
+        return;
+      }
 
       state.cues = cues;
       state.subtitleDelay = 0;
