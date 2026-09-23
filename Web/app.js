@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -1258,6 +1258,22 @@
   });
 
   e.sleep.addEventListener("change", () => setSleepTimer(e.sleep.value));
+
+  e.restartCurrent.addEventListener("click", () => {
+    const item = state.items[state.index];
+    if (!item) return;
+
+    const key = fingerprint(item.file);
+    localStorage.removeItem(K.resume + key);
+    localStorage.removeItem(K.progress + key);
+
+    e.video.currentTime = 0;
+    updatePlaylistProgress(item, 0);
+    closeSheets();
+    e.video.play().catch(() => {});
+    showToast("처음부터 재생할게.");
+  });
+
   e.pip.addEventListener("click", togglePiP);
 
   e.srt.addEventListener("change", (event) => {
