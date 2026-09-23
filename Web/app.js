@@ -84,10 +84,24 @@
     e.queue.hidden = true;
   }
 
+  function scrollCurrentPlaylistItem() {
+    const current = e.list.querySelector(".item.current");
+    if (!current) return;
+
+    requestAnimationFrame(() => {
+      current.scrollIntoView({
+        block: "center",
+        behavior: "smooth"
+      });
+    });
+  }
+
   function openSheet(sheet) {
     closeSheets();
     sheet.hidden = false;
     showControls(true);
+
+    if (sheet === e.queue) scrollCurrentPlaylistItem();
   }
 
   function revokeObjectURL() {
@@ -448,6 +462,8 @@
       li.append(main, remove);
       e.list.append(li);
     });
+
+    if (!e.queue.hidden) scrollCurrentPlaylistItem();
   }
 
   function removeItem(index) {
