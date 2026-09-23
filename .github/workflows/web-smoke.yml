@@ -27,6 +27,39 @@ jobs:
       - name: Validate manifest
         run: python -m json.tool Web/manifest.webmanifest > /dev/null
 
+      - name: Validate DOM element wiring
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          app = Path("Web/app.js").read_text(encoding="utf-8")
+          html = Path("Web/index.html").read_text(encoding="utf-8")
+
+          ids_match = re.search(r'const ids = \[(.*?)\];', app, re.S)
+          if not ids_match:
+              raise SystemExit("Could not find the ids registry in Web/app.js")
+
+          registered = set(re.findall(r'"([^"]+)"', ids_match.group(1)))
+          referenced = set(re.findall(r'\be\.([A-Za-z0-9_]+)', app))
+          html_ids = set(re.findall(r'id="([^"]+)"', html))
+
+          missing_registry = sorted(referenced - registered)
+          missing_html = sorted(registered - html_ids)
+
+          if missing_registry:
+              raise SystemExit(
+                  "e.* references missing from ids registry: " + ", ".join(missing_registry)
+              )
+
+          if missing_html:
+              raise SystemExit(
+                  "Registered ids missing from index.html: " + ", ".join(missing_html)
+              )
+
+          print(f"DOM wiring OK: {len(registered)} registered elements")
+          PY
+
       - name: Verify required files
         run: |
           test -f Web/index.html
