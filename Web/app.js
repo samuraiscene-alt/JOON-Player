@@ -92,10 +92,14 @@
     return "현재 Web 버전은 MP4 / M4V / MOV 동영상만 선택할 수 있어.";
   }
 
+  function fileStem(name) {
+    return String(name || "").replace(/\.[^.]+$/, "").trim().toLowerCase();
+  }
+
   function addFiles(fileList, replace) {
-    const files = Array.from(fileList || []).filter((file) =>
-      /\.(mp4|m4v|mov)$/i.test(file.name)
-    );
+    const selected = Array.from(fileList || []);
+    const files = selected.filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name));
+    const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
     if (!files.length) {
       showToast("동영상 파일을 선택해줘.");
@@ -109,8 +113,13 @@
       state.index = -1;
     }
 
+    const subtitleByStem = new Map(
+      subtitles.map((file) => [fileStem(file.name), file])
+    );
+
     const added = files.map((file) => ({
       file,
+      subtitleFile: subtitleByStem.get(fileStem(file.name)) || null,
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random())
     }));
 
@@ -118,8 +127,15 @@
     state.originalOrder.push(...added);
     renderList();
 
-    if (state.index < 0) playIndex(0, true);
-    else showToast(String(files.length) + "개 파일을 추가했어.");
+    if (state.index < 0) {
+      playIndex(0, true);
+    } else {
+      const matched = added.filter((item) => item.subtitleFile).length;
+      showToast(
+        String(files.length) + "개 파일 추가" +
+        (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "")
+      );
+    }
   }
 
   function playIndex(index, allowResume) {
@@ -146,6 +162,10 @@
     state.subtitleDelay = 0;
     e.subs.textContent = "";
     e.subReset.textContent = "0.0s";
+
+    if (item.subtitleFile) {
+      loadSRT(item.subtitleFile, item.id, true);
+    }
 
     function onLoadedMetadata() {
       e.video.removeEventListener("loadedmetadata", onLoadedMetadata);
@@ -407,12 +427,18 @@
     }).filter(Boolean);
   }
 
-  async function loadSRT(file) {
+  async function loadSRT(file, targetId, automatic) {
     try {
-      state.cues = parseSRT(await file.text());
+      const cues = parseSRT(await file.text());
+      if (targetId && state.items[state.index]?.id !== targetId) return;
+
+      state.cues = cues;
       state.subtitleDelay = 0;
       e.subReset.textContent = "0.0s";
-      showToast(file.name + " · " + String(state.cues.length) + "개 자막");
+      showToast(
+        (automatic ? "자막 자동 연결 · " : "") +
+        file.name + " · " + String(state.cues.length) + "개"
+      );
     } catch {
       showToast("자막 파일을 읽지 못했어.");
     }
@@ -862,7 +888,13 @@
 
   e.srt.addEventListener("change", (event) => {
     const file = event.target.files && event.target.files[0];
-    if (file) loadSRT(file);
+    const item = state.items[state.index];
+
+    if (file && item) {
+      item.subtitleFile = file;
+      loadSRT(file, item.id, false);
+    }
+
     event.target.value = "";
   });
 
