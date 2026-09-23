@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","clearQueue","list","toast","errorModal","errorText","errorOk"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
