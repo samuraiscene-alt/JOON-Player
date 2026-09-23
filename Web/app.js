@@ -41,7 +41,8 @@
     lastTapAt: 0,
     tapTimer: null,
     lastResumeSave: 0,
-    wakeLock: null
+    wakeLock: null,
+    mediaLoadToken: 0
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -387,6 +388,7 @@
 
     state.index = clamp(index, 0, state.items.length - 1);
     const item = state.items[state.index];
+    const loadToken = ++state.mediaLoadToken;
 
     revokeObjectURL();
     state.objectURL = URL.createObjectURL(item.file);
@@ -415,6 +417,14 @@
 
     function onLoadedMetadata() {
       e.video.removeEventListener("loadedmetadata", onLoadedMetadata);
+
+      if (
+        loadToken !== state.mediaLoadToken ||
+        state.items[state.index]?.id !== item.id
+      ) {
+        return;
+      }
+
       e.seek.max = String(e.video.duration || 1);
       e.dur.textContent = formatTime(e.video.duration);
 
