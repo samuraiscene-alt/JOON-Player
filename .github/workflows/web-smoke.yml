@@ -42,10 +42,14 @@ jobs:
 
           registered = set(re.findall(r'"([^"]+)"', ids_match.group(1)))
           referenced = set(re.findall(r'\be\.([A-Za-z0-9_]+)', app))
-          html_ids = set(re.findall(r'id="([^"]+)"', html))
+          html_id_list = re.findall(r'id="([^"]+)"', html)
+          html_ids = set(html_id_list)
 
           missing_registry = sorted(referenced - registered)
           missing_html = sorted(registered - html_ids)
+          duplicate_html_ids = sorted({
+              value for value in html_id_list if html_id_list.count(value) > 1
+          })
 
           if missing_registry:
               raise SystemExit(
@@ -57,7 +61,28 @@ jobs:
                   "Registered ids missing from index.html: " + ", ".join(missing_html)
               )
 
-          print(f"DOM wiring OK: {len(registered)} registered elements")
+          if duplicate_html_ids:
+              raise SystemExit(
+                  "Duplicate ids in index.html: " + ", ".join(duplicate_html_ids)
+              )
+
+          shell_match = re.search(r'const SHELL = \[(.*?)\];', Path("Web/sw.js").read_text(encoding="utf-8"), re.S)
+          if not shell_match:
+              raise SystemExit("Could not find service-worker SHELL list")
+
+          shell_entries = set(re.findall(r'"([^"]+)"', shell_match.group(1)))
+          required_shell = {"./", "./index.html", "./app.js", "./manifest.webmanifest", "./icon.svg"}
+          missing_shell = sorted(required_shell - shell_entries)
+
+          if missing_shell:
+              raise SystemExit(
+                  "Required PWA shell files missing from service worker: " + ", ".join(missing_shell)
+              )
+
+          print(
+              f"DOM wiring OK: {len(registered)} registered elements; "
+              f"PWA shell OK: {len(shell_entries)} entries"
+          )
           PY
 
       - name: Verify required files
