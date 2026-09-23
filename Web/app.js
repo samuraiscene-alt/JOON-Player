@@ -1156,8 +1156,16 @@
     e.gesture.addEventListener("pointercancel", finishGesture);
   }
 
-  [e.openTop, e.openMain, e.add].forEach((button) => {
-    button.addEventListener("click", () => e.videos.click());
+  [e.openTop, e.openMain].forEach((button) => {
+    button.addEventListener("click", () => {
+      e.videos.dataset.replace = "1";
+      e.videos.click();
+    });
+  });
+
+  e.add.addEventListener("click", () => {
+    e.videos.dataset.replace = "0";
+    e.videos.click();
   });
 
   e.openFolderMain.addEventListener("click", () => {
@@ -1171,8 +1179,10 @@
   });
 
   e.videos.addEventListener("change", (event) => {
-    addFiles(event.target.files, state.index < 0);
+    const replace = e.videos.dataset.replace === "1";
+    addFiles(event.target.files, replace);
     event.target.value = "";
+    e.videos.dataset.replace = "";
   });
 
   e.folderInput.addEventListener("change", (event) => {
