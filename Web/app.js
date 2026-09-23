@@ -1317,12 +1317,21 @@
     e.errorText.textContent = item
       ? '"' + item.file.name + '"\n파일이 손상되었거나 iPhone Web에서 지원하지 않는 영상·오디오 코덱일 수 있습니다.'
       : '파일이 손상되었거나 iPhone Web에서 지원하지 않는 영상·오디오 코덱일 수 있습니다.';
+    e.errorNext.hidden = !(
+      state.items.length > 1 &&
+      (state.index < state.items.length - 1 || state.repeat === "all")
+    );
     e.errorModal.hidden = false;
   });
 
   e.errorOk.addEventListener("click", () => {
     e.errorModal.hidden = true;
     showControls(true);
+  });
+
+  e.errorNext.addEventListener("click", () => {
+    e.errorModal.hidden = true;
+    next(false);
   });
 
   function isPiPActive() {
