@@ -490,13 +490,19 @@
     );
 
     if (!state.items.length) {
+      e.video.pause();
+      setWebFullscreen(false);
+      if (state.locked) setLocked(false);
       revokeObjectURL();
       state.index = -1;
       e.video.removeAttribute("src");
+      e.video.load();
+      e.subs.textContent = "";
       e.player.hidden = true;
       e.home.hidden = false;
       document.body.classList.remove("player-active");
       closeSheets();
+      updateNavigation();
       return;
     }
 
@@ -1352,6 +1358,8 @@
 
     persistResume(true);
     e.video.pause();
+    setWebFullscreen(false);
+    if (state.locked) setLocked(false);
     revokeObjectURL();
 
     state.items = [];
