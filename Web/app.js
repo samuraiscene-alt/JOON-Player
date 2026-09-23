@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -30,6 +30,7 @@
     sleepTimer: null,
     sleepAtEnd: false,
     cues: [],
+    subtitleEnabled: true,
     subtitleDelay: 0,
     subtitleSize: Number(localStorage.getItem(K.subSize) || 100),
     subtitlePosition: localStorage.getItem(K.subPos) || "low",
@@ -385,8 +386,10 @@
     state.a = null;
     state.b = null;
     state.cues = [];
+    state.subtitleEnabled = true;
     state.subtitleDelay = 0;
     e.subs.textContent = "";
+    e.subToggle.textContent = "자막 표시 끄기";
     e.subReset.textContent = "0.0s";
 
     if (item.subtitleFile) {
@@ -735,9 +738,28 @@
   }
 
   function updateSubtitle() {
+    if (!state.subtitleEnabled) {
+      e.subs.textContent = "";
+      return;
+    }
+
     const t = e.video.currentTime - state.subtitleDelay;
     const cue = state.cues.find((item) => t >= item.start && t <= item.end);
     e.subs.textContent = cue ? cue.text : "";
+  }
+
+  function toggleSubtitleVisibility() {
+    if (!state.cues.length) {
+      showToast("연결된 자막이 없어.");
+      return;
+    }
+
+    state.subtitleEnabled = !state.subtitleEnabled;
+    e.subToggle.textContent = state.subtitleEnabled
+      ? "자막 표시 끄기"
+      : "자막 표시 켜기";
+    updateSubtitle();
+    showToast(state.subtitleEnabled ? "자막 표시 켬" : "자막 표시 끔");
   }
 
   function adjustSubtitleDelay(delta) {
@@ -1206,6 +1228,7 @@
     event.target.value = "";
   });
 
+  e.subToggle.addEventListener("click", toggleSubtitleVisibility);
   e.subMinus.addEventListener("click", () => adjustSubtitleDelay(-0.1));
   e.subPlus.addEventListener("click", () => adjustSubtitleDelay(0.1));
 
