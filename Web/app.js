@@ -1320,13 +1320,29 @@
     if (!state.items.length) return;
     if (!window.confirm("현재 재생 목록의 시청기록을 모두 초기화할까?")) return;
 
+    const current = state.items[state.index];
+    const wasPlaying = !e.video.paused;
+
     state.items.forEach((item) => {
       const key = fingerprint(item.file);
       localStorage.removeItem(K.resume + key);
       localStorage.removeItem(K.progress + key);
     });
 
+    state.lastResumeSave = 0;
+
+    if (current && Number.isFinite(e.video.duration)) {
+      e.video.currentTime = 0;
+      e.seek.value = "0";
+      e.now.textContent = "0:00";
+    }
+
     renderList();
+
+    if (wasPlaying) {
+      e.video.play().catch(() => {});
+    }
+
     showToast("시청기록을 초기화했어.");
   });
 
