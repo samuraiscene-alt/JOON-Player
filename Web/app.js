@@ -250,7 +250,13 @@
       return;
     }
 
-    if (!fromEnded) showToast("마지막 영상이야.");
+    if (fromEnded) {
+      openSheet(e.queue);
+      showToast("재생이 끝났어.");
+      return;
+    }
+
+    showToast("마지막 영상이야.");
   }
 
   function previous() {
