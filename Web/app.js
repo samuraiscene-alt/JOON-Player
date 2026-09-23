@@ -173,12 +173,22 @@
     const selected = Array.from(fileList || []);
     const files = selected
       .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, "ko-KR", {
+      .sort((a, b) => {
+        const episodeA = episodeNumber(a.name);
+        const episodeB = episodeNumber(b.name);
+
+        if (episodeA !== null && episodeB !== null && episodeA !== episodeB) {
+          return episodeA - episodeB;
+        }
+
+        if (episodeA !== null && episodeB === null) return -1;
+        if (episodeA === null && episodeB !== null) return 1;
+
+        return a.name.localeCompare(b.name, "ko-KR", {
           numeric: true,
           sensitivity: "base"
-        })
-      );
+        });
+      });
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
     if (!files.length) {
