@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -382,6 +382,7 @@
     e.pos.textContent = String(state.index + 1) + " / " + String(state.items.length);
     e.home.hidden = true;
     e.player.hidden = false;
+    e.resumeSession.hidden = false;
     document.body.classList.add("player-active");
 
     state.a = null;
@@ -500,6 +501,7 @@
       e.subs.textContent = "";
       e.player.hidden = true;
       e.home.hidden = false;
+      e.resumeSession.hidden = true;
       document.body.classList.remove("player-active");
       closeSheets();
       updateNavigation();
@@ -1215,7 +1217,18 @@
     e.video.pause();
     e.player.hidden = true;
     e.home.hidden = false;
+    e.resumeSession.hidden = !state.items.length;
     document.body.classList.remove("player-active");
+  });
+
+  e.resumeSession.addEventListener("click", () => {
+    if (!state.items.length || state.index < 0) return;
+
+    e.home.hidden = true;
+    e.player.hidden = false;
+    document.body.classList.add("player-active");
+    showControls(true);
+    e.video.play().catch(() => showToast("이 파일을 재생할 수 없어."));
   });
 
   e.play.addEventListener("click", () => {
@@ -1375,6 +1388,7 @@
     e.list.innerHTML = "";
     e.player.hidden = true;
     e.home.hidden = false;
+    e.resumeSession.hidden = true;
     document.body.classList.remove("player-active");
     closeSheets();
     updateNavigation();
