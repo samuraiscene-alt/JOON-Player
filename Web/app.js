@@ -258,6 +258,9 @@
       .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
       .sort(compareVideoFiles);
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
+    const unsupportedVideos = selected.filter((file) =>
+      /\.(mkv|avi|ts|m2ts|webm|flv)$/i.test(file.name)
+    );
 
     if (!candidates.length) {
       if (subtitles.length && state.items.length) {
@@ -270,7 +273,11 @@
         return;
       }
 
-      showToast("동영상 파일을 선택해줘.");
+      showToast(
+        unsupportedVideos.length
+          ? "현재 Web에서 지원하지 않는 영상 " + String(unsupportedVideos.length) + "개를 제외했어."
+          : "동영상 파일을 선택해줘."
+      );
       return;
     }
 
@@ -316,12 +323,23 @@
         (item) => storedProgress(item) < 0.95
       );
       playIndex(firstUnfinished >= 0 ? firstUnfinished : 0, true);
+      if (unsupportedVideos.length) {
+        setTimeout(() => {
+          showToast(
+            "지원하지 않는 영상 " + String(unsupportedVideos.length) + "개 제외",
+            2200
+          );
+        }, 450);
+      }
     } else {
       const matched = added.filter((item) => item.subtitleFile).length + matchedExisting;
       showToast(
         String(files.length) + "개 파일 추가" +
         (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "") +
-        (skipped ? " · 중복 " + String(skipped) + "개 제외" : "")
+        (skipped ? " · 중복 " + String(skipped) + "개 제외" : "") +
+        (unsupportedVideos.length
+          ? " · 지원 안 됨 " + String(unsupportedVideos.length) + "개 제외"
+          : "")
       );
     }
   }
