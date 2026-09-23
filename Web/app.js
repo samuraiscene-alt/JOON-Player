@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","add","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -989,9 +989,27 @@
     button.addEventListener("click", () => e.videos.click());
   });
 
+  e.openFolderMain.addEventListener("click", () => {
+    e.folderInput.dataset.replace = "1";
+    e.folderInput.click();
+  });
+
+  e.addFolder.addEventListener("click", () => {
+    e.folderInput.dataset.replace = "0";
+    e.folderInput.click();
+  });
+
   e.videos.addEventListener("change", (event) => {
     addFiles(event.target.files, state.index < 0);
     event.target.value = "";
+  });
+
+  e.folderInput.addEventListener("change", (event) => {
+    const files = event.target.files;
+    const replace = e.folderInput.dataset.replace === "1";
+    addFiles(files, replace);
+    event.target.value = "";
+    e.folderInput.dataset.replace = "";
   });
 
   e.back.addEventListener("click", () => {
