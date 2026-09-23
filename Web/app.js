@@ -364,7 +364,7 @@
 
       const main = document.createElement("button");
       main.innerHTML =
-        '<strong></strong><small></small><span class="watch-progress" aria-hidden="true"><span class="watch-progress-fill"></span></span>';
+        '<span class="item-title-row"><strong></strong><span class="watch-progress" aria-hidden="true"><span class="watch-progress-fill"></span></span></span><small></small>';
       main.querySelector("strong").textContent = item.file.name;
       main.querySelector("small").textContent =
         (item.file.size / 1048576).toFixed(item.file.size > 104857600 ? 0 : 1) + " MB";
