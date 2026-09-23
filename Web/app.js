@@ -171,7 +171,14 @@
 
   function addFiles(fileList, replace) {
     const selected = Array.from(fileList || []);
-    const files = selected.filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name));
+    const files = selected
+      .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, "ko-KR", {
+          numeric: true,
+          sensitivity: "base"
+        })
+      );
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
     if (!files.length) {
