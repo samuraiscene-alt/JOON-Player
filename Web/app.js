@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -1279,6 +1279,20 @@
 
   e.repeat.addEventListener("click", cycleRepeat);
   e.shuffle.addEventListener("click", toggleShuffle);
+
+  e.resetProgress.addEventListener("click", () => {
+    if (!state.items.length) return;
+    if (!window.confirm("현재 재생 목록의 시청기록을 모두 초기화할까?")) return;
+
+    state.items.forEach((item) => {
+      const key = fingerprint(item.file);
+      localStorage.removeItem(K.resume + key);
+      localStorage.removeItem(K.progress + key);
+    });
+
+    renderList();
+    showToast("시청기록을 초기화했어.");
+  });
 
   e.clearQueue.addEventListener("click", () => {
     if (!state.items.length) return;
