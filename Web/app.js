@@ -10,7 +10,8 @@
     fit: "jp.web.fit",
     subSize: "jp.web.subSize",
     subPos: "jp.web.subPos",
-    resume: "jp.web.resume."
+    resume: "jp.web.resume.",
+    completed: "jp.web.completed."
   };
 
   const state = {
@@ -344,8 +345,11 @@
       const main = document.createElement("button");
       main.innerHTML = "<strong></strong><small></small>";
       main.querySelector("strong").textContent = item.file.name;
+      const completed = localStorage.getItem(K.completed + fingerprint(item.file)) === "1";
       main.querySelector("small").textContent =
-        (item.file.size / 1048576).toFixed(item.file.size > 104857600 ? 0 : 1) + " MB";
+        (item.file.size / 1048576).toFixed(item.file.size > 104857600 ? 0 : 1) +
+        " MB" +
+        (completed ? " · ✓ 시청 완료" : "");
       main.addEventListener("click", () => {
         playIndex(index, true);
         closeSheets();
@@ -1077,7 +1081,11 @@
     persistResume(true);
     const item = state.items[state.index];
 
-    if (item) localStorage.removeItem(K.resume + fingerprint(item.file));
+    if (item) {
+      localStorage.removeItem(K.resume + fingerprint(item.file));
+      localStorage.setItem(K.completed + fingerprint(item.file), "1");
+      renderList();
+    }
 
     if (state.sleepAtEnd) {
       state.sleepAtEnd = false;
