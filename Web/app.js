@@ -455,6 +455,12 @@
       main.querySelector(".watch-progress-fill").style.width =
         String(storedProgress(item) * 100) + "%";
       main.addEventListener("click", () => {
+        if (index === state.index) {
+          closeSheets();
+          showControls(true);
+          return;
+        }
+
         playIndex(index, true);
         closeSheets();
       });
