@@ -188,12 +188,12 @@
 
   function addFiles(fileList, replace) {
     const selected = Array.from(fileList || []);
-    const files = selected
+    const candidates = selected
       .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
       .sort(compareVideoFiles);
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
-    if (!files.length) {
+    if (!candidates.length) {
       showToast("동영상 파일을 선택해줘.");
       return;
     }
@@ -203,6 +203,15 @@
       state.items = [];
       state.originalOrder = [];
       state.index = -1;
+    }
+
+    const existing = new Set(state.items.map((item) => fingerprint(item.file)));
+    const files = candidates.filter((file) => !existing.has(fingerprint(file)));
+    const skipped = candidates.length - files.length;
+
+    if (!files.length) {
+      showToast("이미 재생목록에 있는 파일이야.");
+      return;
     }
 
     const added = files.map((file) => ({
@@ -230,7 +239,8 @@
       const matched = added.filter((item) => item.subtitleFile).length;
       showToast(
         String(files.length) + "개 파일 추가" +
-        (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "")
+        (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "") +
+        (skipped ? " · 중복 " + String(skipped) + "개 제외" : "")
       );
     }
   }
