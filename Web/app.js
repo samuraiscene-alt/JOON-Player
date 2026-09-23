@@ -269,7 +269,10 @@
     updateNavigation();
 
     if (state.index < 0) {
-      playIndex(0, true);
+      const firstUnfinished = state.items.findIndex(
+        (item) => storedProgress(item) < 0.95
+      );
+      playIndex(firstUnfinished >= 0 ? firstUnfinished : 0, true);
     } else {
       const matched = added.filter((item) => item.subtitleFile).length + matchedExisting;
       showToast(
