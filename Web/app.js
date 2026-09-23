@@ -334,7 +334,22 @@
     state.items.sort((a, b) => compareVideoFiles(a.file, b.file));
     state.originalOrder = state.items.slice();
 
-    if (currentId) {
+    if (state.shuffle) {
+      const current = currentId
+        ? state.items.find((item) => item.id === currentId)
+        : null;
+      const rest = state.items.filter((item) => item.id !== (current && current.id));
+
+      for (let i = rest.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = rest[i];
+        rest[i] = rest[j];
+        rest[j] = temp;
+      }
+
+      state.items = current ? [current, ...rest] : rest;
+      state.index = current ? 0 : -1;
+    } else if (currentId) {
       state.index = state.items.findIndex((item) => item.id === currentId);
     }
 
