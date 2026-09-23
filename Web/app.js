@@ -1458,6 +1458,7 @@
 
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input,select")) return;
+    if (state.locked) return;
 
     if (event.code === "Space") {
       event.preventDefault();
