@@ -461,6 +461,7 @@
           return;
         }
 
+        persistResume(true);
         playIndex(index, true);
         closeSheets();
       });
@@ -520,6 +521,8 @@
   }
 
   function next(fromEnded) {
+    if (!fromEnded) persistResume(true);
+
     if (fromEnded && state.repeat === "one") {
       e.video.currentTime = 0;
       e.video.play().catch(() => {});
@@ -546,6 +549,8 @@
   }
 
   function previous() {
+    persistResume(true);
+
     if (state.index > 0) {
       playIndex(state.index - 1, true);
       return;
