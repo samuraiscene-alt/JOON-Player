@@ -96,6 +96,79 @@
     return String(name || "").replace(/\.[^.]+$/, "").trim().toLowerCase();
   }
 
+  function episodeNumber(name) {
+    const stem = fileStem(name);
+
+    const labeled = stem.match(/(?:^|[\s._-])(?:ep(?:isode)?|e)\s*0*(\d{1,4})(?=$|[^0-9])/i);
+    if (labeled) return Number(labeled[1]);
+
+    const korean = stem.match(/0*(\d{1,4})\s*(?:화|회)(?=$|[^가-힣a-z0-9])/i);
+    if (korean) return Number(korean[1]);
+
+    return null;
+  }
+
+  function seriesTitle(name) {
+    return fileStem(name)
+      .replace(/(?:^|[\s._-])(?:ep(?:isode)?|e)\s*0*\d{1,4}(?=$|[^0-9])/gi, " ")
+      .replace(/0*\d{1,4}\s*(?:화|회)(?=$|[^가-힣a-z0-9])/gi, " ")
+      .replace(/[\[\](){}._-]+/g, " ")
+      .replace(/\s+/g, "")
+      .trim();
+  }
+
+  function titleSimilarity(a, b) {
+    if (!a || !b) return 0;
+    if (a === b) return 1;
+    if (a.includes(b) || b.includes(a)) {
+      return Math.min(a.length, b.length) / Math.max(a.length, b.length);
+    }
+
+    const bigrams = (value) => {
+      if (value.length < 2) return [value];
+      const result = [];
+      for (let i = 0; i < value.length - 1; i += 1) result.push(value.slice(i, i + 2));
+      return result;
+    };
+
+    const aa = bigrams(a);
+    const bb = bigrams(b);
+    const remaining = bb.slice();
+    let matches = 0;
+
+    aa.forEach((gram) => {
+      const index = remaining.indexOf(gram);
+      if (index >= 0) {
+        matches += 1;
+        remaining.splice(index, 1);
+      }
+    });
+
+    return (2 * matches) / (aa.length + bb.length);
+  }
+
+  function findSubtitleForVideo(videoFile, subtitles) {
+    const exact = subtitles.find((file) => fileStem(file.name) === fileStem(videoFile.name));
+    if (exact) return exact;
+
+    const episode = episodeNumber(videoFile.name);
+    if (episode === null) return null;
+
+    const videoTitle = seriesTitle(videoFile.name);
+    const candidates = subtitles
+      .filter((file) => episodeNumber(file.name) === episode)
+      .map((file) => ({
+        file,
+        score: titleSimilarity(videoTitle, seriesTitle(file.name))
+      }))
+      .sort((a, b) => b.score - a.score);
+
+    if (!candidates.length || candidates[0].score < 0.6) return null;
+    if (candidates[1] && candidates[0].score - candidates[1].score < 0.08) return null;
+
+    return candidates[0].file;
+  }
+
   function addFiles(fileList, replace) {
     const selected = Array.from(fileList || []);
     const files = selected.filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name));
@@ -113,13 +186,9 @@
       state.index = -1;
     }
 
-    const subtitleByStem = new Map(
-      subtitles.map((file) => [fileStem(file.name), file])
-    );
-
     const added = files.map((file) => ({
       file,
-      subtitleFile: subtitleByStem.get(fileStem(file.name)) || null,
+      subtitleFile: findSubtitleForVideo(file, subtitles),
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random())
     }));
 
