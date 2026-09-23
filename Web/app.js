@@ -93,7 +93,26 @@
     return String(name || "").replace(/\.[^.]+$/, "").trim().toLowerCase();
   }
 
+  function seasonEpisode(name) {
+    const stem = fileStem(name);
+
+    const compact = stem.match(/(?:^|[^a-z0-9])s\s*0*(\d{1,2})\s*e\s*0*(\d{1,4})(?=$|[^0-9])/i);
+    if (compact) {
+      return { season: Number(compact[1]), episode: Number(compact[2]) };
+    }
+
+    const korean = stem.match(/(?:시즌|season)\s*0*(\d{1,2}).*?0*(\d{1,4})\s*(?:화|회)/i);
+    if (korean) {
+      return { season: Number(korean[1]), episode: Number(korean[2]) };
+    }
+
+    return null;
+  }
+
   function episodeNumber(name) {
+    const season = seasonEpisode(name);
+    if (season) return season.episode;
+
     const stem = fileStem(name);
 
     const labeled = stem.match(/(?:^|[\s._-])(?:ep(?:isode)?|e)\s*0*(\d{1,4})(?=$|[^0-9])/i);
@@ -107,6 +126,8 @@
 
   function seriesTitle(name) {
     return fileStem(name)
+      .replace(/(?:^|[^a-z0-9])s\s*0*\d{1,2}\s*e\s*0*\d{1,4}(?=$|[^0-9])/gi, " ")
+      .replace(/(?:시즌|season)\s*0*\d{1,2}/gi, " ")
       .replace(/(?:^|[\s._-])(?:ep(?:isode)?|e)\s*0*\d{1,4}(?=$|[^0-9])/gi, " ")
       .replace(/0*\d{1,4}\s*(?:화|회)(?=$|[^가-힣a-z0-9])/gi, " ")
       .replace(/[\[\](){}._-]+/g, " ")
@@ -151,9 +172,19 @@
     const episode = episodeNumber(videoFile.name);
     if (episode === null) return null;
 
+    const videoSeason = seasonEpisode(videoFile.name);
     const videoTitle = seriesTitle(videoFile.name);
     const candidates = subtitles
-      .filter((file) => episodeNumber(file.name) === episode)
+      .filter((file) => {
+        if (episodeNumber(file.name) !== episode) return false;
+
+        const subtitleSeason = seasonEpisode(file.name);
+        if (videoSeason && subtitleSeason) {
+          return videoSeason.season === subtitleSeason.season;
+        }
+
+        return true;
+      })
       .map((file) => ({
         file,
         score: titleSimilarity(videoTitle, seriesTitle(file.name))
@@ -167,6 +198,18 @@
   }
 
   function compareVideoFiles(a, b) {
+    const seasonA = seasonEpisode(a.name);
+    const seasonB = seasonEpisode(b.name);
+
+    if (seasonA && seasonB) {
+      if (seasonA.season !== seasonB.season) {
+        return seasonA.season - seasonB.season;
+      }
+      if (seasonA.episode !== seasonB.episode) {
+        return seasonA.episode - seasonB.episode;
+      }
+    }
+
     const episodeA = episodeNumber(a.name);
     const episodeB = episodeNumber(b.name);
 
