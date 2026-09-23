@@ -1,10 +1,11 @@
-const CACHE = "joon-player-web-v3";
+const CACHE = "joon-player-web-v4";
 const SHELL = [
   "./",
   "./index.html",
   "./app.js",
   "./manifest.webmanifest",
-  "./icon.svg"
+  "./icon.svg",
+  "./apple-touch-icon.png"
 ];
 
 self.addEventListener("install", (event) => {
