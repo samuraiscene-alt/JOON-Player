@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","add","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","notice","errorModal","errorText","errorOk"];
+  const ids = ["home","player","videos","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","add","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","pip","srt","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","list","toast","errorModal","errorText","errorOk"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -87,10 +87,6 @@
     if (!state.objectURL) return;
     URL.revokeObjectURL(state.objectURL);
     state.objectURL = null;
-  }
-
-  function supportText() {
-    return "현재 Web 버전은 MP4 / M4V / MOV 동영상만 선택할 수 있어.";
   }
 
   function fileStem(name) {
@@ -300,7 +296,6 @@
     e.home.hidden = true;
     e.player.hidden = false;
     document.body.classList.add("player-active");
-    e.notice.textContent = supportText(item.file);
 
     state.a = null;
     state.b = null;
