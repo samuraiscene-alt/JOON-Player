@@ -11,7 +11,7 @@
     subSize: "jp.web.subSize",
     subPos: "jp.web.subPos",
     resume: "jp.web.resume.",
-    completed: "jp.web.completed."
+    progress: "jp.web.progress."
   };
 
   const state = {
@@ -335,21 +335,41 @@
     updateNavigation();
   }
 
+  function storedProgress(item) {
+    return clamp(
+      Number(localStorage.getItem(K.progress + fingerprint(item.file)) || 0),
+      0,
+      1
+    );
+  }
+
+  function updatePlaylistProgress(item, ratio) {
+    if (!item) return;
+    const index = state.items.findIndex((entry) => entry.id === item.id);
+    if (index < 0) return;
+
+    const fill = e.list.querySelector(
+      '[data-index="' + String(index) + '"] .watch-progress-fill'
+    );
+    if (fill) fill.style.width = String(clamp(ratio, 0, 1) * 100) + "%";
+  }
+
   function renderList() {
     e.list.innerHTML = "";
 
     state.items.forEach((item, index) => {
       const li = document.createElement("li");
       li.className = "item" + (index === state.index ? " current" : "");
+      li.dataset.index = String(index);
 
       const main = document.createElement("button");
-      main.innerHTML = "<strong></strong><small></small>";
+      main.innerHTML =
+        '<strong></strong><small></small><span class="watch-progress" aria-hidden="true"><span class="watch-progress-fill"></span></span>';
       main.querySelector("strong").textContent = item.file.name;
-      const completed = localStorage.getItem(K.completed + fingerprint(item.file)) === "1";
       main.querySelector("small").textContent =
-        (item.file.size / 1048576).toFixed(item.file.size > 104857600 ? 0 : 1) +
-        " MB" +
-        (completed ? " · ✓ 시청 완료" : "");
+        (item.file.size / 1048576).toFixed(item.file.size > 104857600 ? 0 : 1) + " MB";
+      main.querySelector(".watch-progress-fill").style.width =
+        String(storedProgress(item) * 100) + "%";
       main.addEventListener("click", () => {
         playIndex(index, true);
         closeSheets();
@@ -484,18 +504,26 @@
 
   function persistResume(force) {
     const item = state.items[state.index];
-    if (!item || !Number.isFinite(e.video.duration)) return;
+    if (!item || !Number.isFinite(e.video.duration) || e.video.duration <= 0) return;
+
+    const current = e.video.currentTime;
+    const remaining = e.video.duration - current;
+    const ratio = clamp(current / e.video.duration, 0, 1);
+
+    updatePlaylistProgress(item, ratio);
 
     const now = Date.now();
     if (!force && now - state.lastResumeSave < 5000) return;
     state.lastResumeSave = now;
 
-    const key = K.resume + fingerprint(item.file);
-    const current = e.video.currentTime;
-    const remaining = e.video.duration - current;
+    const resumeKey = K.resume + fingerprint(item.file);
+    const progressKey = K.progress + fingerprint(item.file);
 
-    if (current >= 10 && remaining >= 30) localStorage.setItem(key, String(current));
-    else localStorage.removeItem(key);
+    if (current >= 1) localStorage.setItem(progressKey, String(ratio));
+    else localStorage.removeItem(progressKey);
+
+    if (current >= 10 && remaining >= 30) localStorage.setItem(resumeKey, String(current));
+    else localStorage.removeItem(resumeKey);
   }
 
   function updateTimeline() {
@@ -1083,7 +1111,7 @@
 
     if (item) {
       localStorage.removeItem(K.resume + fingerprint(item.file));
-      localStorage.setItem(K.completed + fingerprint(item.file), "1");
+      localStorage.setItem(K.progress + fingerprint(item.file), "1");
       renderList();
     }
 
