@@ -58,6 +58,13 @@
     return encodeURIComponent(file.name + "|" + file.size + "|" + file.lastModified);
   }
 
+  function duplicateKey(file) {
+    const relativePath = String(file.webkitRelativePath || "").trim();
+    return encodeURIComponent(
+      (relativePath || file.name) + "|" + file.size + "|" + file.lastModified
+    );
+  }
+
   function showToast(message, duration) {
     clearTimeout(state.toastTimer);
     e.toast.textContent = message;
@@ -288,8 +295,8 @@
       state.index = -1;
     }
 
-    const existing = new Set(state.items.map((item) => fingerprint(item.file)));
-    const files = candidates.filter((file) => !existing.has(fingerprint(file)));
+    const existing = new Set(state.items.map((item) => duplicateKey(item.file)));
+    const files = candidates.filter((file) => !existing.has(duplicateKey(file)));
     const skipped = candidates.length - files.length;
 
     if (!files.length) {
