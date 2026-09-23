@@ -306,7 +306,16 @@
     }
 
     if (replace) {
+      if (state.index >= 0) persistResume(true);
+      e.video.pause();
+      state.mediaLoadToken += 1;
       revokeObjectURL();
+
+      clearTimeout(state.sleepTimer);
+      state.sleepTimer = null;
+      state.sleepAtEnd = false;
+      e.sleep.value = "off";
+
       state.items = [];
       state.originalOrder = [];
       state.index = -1;
