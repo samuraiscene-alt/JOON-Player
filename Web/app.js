@@ -169,26 +169,28 @@
     return candidates[0].file;
   }
 
+  function compareVideoFiles(a, b) {
+    const episodeA = episodeNumber(a.name);
+    const episodeB = episodeNumber(b.name);
+
+    if (episodeA !== null && episodeB !== null && episodeA !== episodeB) {
+      return episodeA - episodeB;
+    }
+
+    if (episodeA !== null && episodeB === null) return -1;
+    if (episodeA === null && episodeB !== null) return 1;
+
+    return a.name.localeCompare(b.name, "ko-KR", {
+      numeric: true,
+      sensitivity: "base"
+    });
+  }
+
   function addFiles(fileList, replace) {
     const selected = Array.from(fileList || []);
     const files = selected
       .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
-      .sort((a, b) => {
-        const episodeA = episodeNumber(a.name);
-        const episodeB = episodeNumber(b.name);
-
-        if (episodeA !== null && episodeB !== null && episodeA !== episodeB) {
-          return episodeA - episodeB;
-        }
-
-        if (episodeA !== null && episodeB === null) return -1;
-        if (episodeA === null && episodeB !== null) return 1;
-
-        return a.name.localeCompare(b.name, "ko-KR", {
-          numeric: true,
-          sensitivity: "base"
-        });
-      });
+      .sort(compareVideoFiles);
     const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
 
     if (!files.length) {
@@ -209,9 +211,18 @@
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random())
     }));
 
+    const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
+
     state.items.push(...added);
-    state.originalOrder.push(...added);
+    state.items.sort((a, b) => compareVideoFiles(a.file, b.file));
+    state.originalOrder = state.items.slice();
+
+    if (currentId) {
+      state.index = state.items.findIndex((item) => item.id === currentId);
+    }
+
     renderList();
+    updateNavigation();
 
     if (state.index < 0) {
       playIndex(0, true);
