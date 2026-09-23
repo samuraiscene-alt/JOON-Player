@@ -40,7 +40,8 @@
     temporaryRate: null,
     lastTapAt: 0,
     tapTimer: null,
-    lastResumeSave: 0
+    lastResumeSave: 0,
+    wakeLock: null
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -625,6 +626,33 @@
 
     updateSubtitle();
     persistResume(false);
+  }
+
+  async function requestWakeLock() {
+    if (!("wakeLock" in navigator) || document.hidden || e.video.paused) return;
+
+    try {
+      if (!state.wakeLock) {
+        state.wakeLock = await navigator.wakeLock.request("screen");
+        state.wakeLock.addEventListener("release", () => {
+          state.wakeLock = null;
+        });
+      }
+    } catch {
+      state.wakeLock = null;
+    }
+  }
+
+  async function releaseWakeLock() {
+    if (!state.wakeLock) return;
+
+    try {
+      await state.wakeLock.release();
+    } catch {
+      // Ignore release errors; the browser may have already released it.
+    } finally {
+      state.wakeLock = null;
+    }
   }
 
   function updatePlayButton() {
@@ -1247,11 +1275,15 @@
   e.shuffle.addEventListener("click", toggleShuffle);
 
   e.video.addEventListener("timeupdate", updateTimeline);
-  e.video.addEventListener("play", updatePlayButton);
+  e.video.addEventListener("play", () => {
+    updatePlayButton();
+    requestWakeLock();
+  });
 
   e.video.addEventListener("pause", () => {
     updatePlayButton();
     persistResume(true);
+    releaseWakeLock();
   });
 
   e.video.addEventListener("durationchange", () => {
@@ -1312,7 +1344,12 @@
   }
 
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) pauseForBackground();
+    if (document.hidden) {
+      releaseWakeLock();
+      pauseForBackground();
+    } else if (!e.video.paused) {
+      requestWakeLock();
+    }
   });
 
   window.addEventListener("pagehide", pauseForBackground);
