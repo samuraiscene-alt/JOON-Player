@@ -478,6 +478,11 @@
 
   function removeItem(index) {
     const removingCurrent = index === state.index;
+
+    if (removingCurrent) {
+      persistResume(true);
+    }
+
     state.items.splice(index, 1);
     state.originalOrder = state.originalOrder.filter((item) =>
       state.items.some((current) => current.id === item.id)
