@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -148,8 +148,41 @@
     return null;
   }
 
+  function stripSubtitleLanguage(stem) {
+    return String(stem || "").replace(
+      /(?:[\s._-]+)(?:ko|kor|kr|korean|한국어|en|eng|english|영어|ja|jpn|jp|japanese|일본어|zh|zho|chi|chinese|중국어)$/i,
+      ""
+    );
+  }
+
+  function subtitleLanguage(file) {
+    const stem = fileStem(file && file.name);
+    const match = stem.match(
+      /(?:^|[\s._-])(ko|kor|kr|korean|한국어|en|eng|english|영어|ja|jpn|jp|japanese|일본어|zh|zho|chi|chinese|중국어)$/i
+    );
+    const token = match ? match[1].toLowerCase() : "";
+
+    if (/^(ko|kor|kr|korean|한국어)$/i.test(token)) return { code: "ko", label: "한국어" };
+    if (/^(en|eng|english|영어)$/i.test(token)) return { code: "en", label: "English" };
+    if (/^(ja|jpn|jp|japanese|일본어)$/i.test(token)) return { code: "ja", label: "日本語" };
+    if (/^(zh|zho|chi|chinese|중국어)$/i.test(token)) return { code: "zh", label: "中文" };
+    return { code: "und", label: "기타" };
+  }
+
+  function preferredSubtitle(files) {
+    const list = Array.from(files || []);
+    return (
+      list.find((file) => subtitleLanguage(file).code === "ko") ||
+      list.find((file) => subtitleLanguage(file).code === "und") ||
+      list.find((file) => subtitleLanguage(file).code === "en") ||
+      list.find((file) => subtitleLanguage(file).code === "ja") ||
+      list[0] ||
+      null
+    );
+  }
+
   function seriesTitle(name) {
-    return fileStem(name)
+    return stripSubtitleLanguage(fileStem(name))
       .replace(/(?:^|[^a-z0-9])s\s*0*\d{1,2}\s*e\s*0*\d{1,4}(?=$|[^0-9])/gi, " ")
       .replace(/(?:시즌|season)\s*0*\d{1,2}/gi, " ")
       .replace(/(?:^|[\s._-])(?:ep(?:isode)?|e)\s*0*\d{1,4}(?=$|[^0-9])/gi, " ")
@@ -189,12 +222,15 @@
     return (2 * matches) / (aa.length + bb.length);
   }
 
-  function findSubtitleForVideo(videoFile, subtitles) {
-    const exact = subtitles.find((file) => fileStem(file.name) === fileStem(videoFile.name));
-    if (exact) return exact;
+  function findSubtitlesForVideo(videoFile, subtitles) {
+    const videoStem = fileStem(videoFile.name);
+    const exact = subtitles.filter(
+      (file) => stripSubtitleLanguage(fileStem(file.name)) === videoStem
+    );
+    if (exact.length) return exact;
 
     const episode = episodeNumber(videoFile.name);
-    if (episode === null) return null;
+    if (episode === null) return [];
 
     const videoSeason = seasonEpisode(videoFile.name);
     const videoTitle = seriesTitle(videoFile.name);
@@ -215,10 +251,103 @@
       }))
       .sort((a, b) => b.score - a.score);
 
-    if (!candidates.length || candidates[0].score < 0.6) return null;
-    if (candidates[1] && candidates[0].score - candidates[1].score < 0.08) return null;
+    if (!candidates.length || candidates[0].score < 0.6) return [];
 
-    return candidates[0].file;
+    const minimum = Math.max(0.6, candidates[0].score - 0.08);
+    return candidates
+      .filter((candidate) => candidate.score >= minimum)
+      .map((candidate) => candidate.file);
+  }
+
+  function findSubtitleForVideo(videoFile, subtitles) {
+    return preferredSubtitle(findSubtitlesForVideo(videoFile, subtitles));
+  }
+
+  function subtitleFilesForItem(item) {
+    if (!item) return [];
+    if (Array.isArray(item.subtitleFiles) && item.subtitleFiles.length) {
+      return item.subtitleFiles;
+    }
+    return item.subtitleFile ? [item.subtitleFile] : [];
+  }
+
+  function resolveSubtitleFile(item) {
+    const files = subtitleFilesForItem(item);
+    const mode = item && item.subtitleMode ? item.subtitleMode : "auto";
+
+    if (mode === "off") return null;
+
+    if (mode.startsWith("file:")) {
+      const key = mode.slice(5);
+      return files.find((file) => fingerprint(file) === key) || preferredSubtitle(files);
+    }
+
+    return preferredSubtitle(files);
+  }
+
+  function updateSubtitleLanguageMenu(item) {
+    e.subLang.innerHTML = "";
+
+    const auto = document.createElement("option");
+    auto.value = "auto";
+    auto.textContent = "자동";
+    e.subLang.append(auto);
+
+    const files = subtitleFilesForItem(item);
+    const labelCounts = new Map();
+
+    files.forEach((file) => {
+      const language = subtitleLanguage(file);
+      const count = (labelCounts.get(language.label) || 0) + 1;
+      labelCounts.set(language.label, count);
+
+      const option = document.createElement("option");
+      option.value = "file:" + fingerprint(file);
+      option.textContent = language.code === "und"
+        ? file.name
+        : language.label + (count > 1 ? " " + String(count) : "");
+      e.subLang.append(option);
+    });
+
+    const off = document.createElement("option");
+    off.value = "off";
+    off.textContent = "끔";
+    e.subLang.append(off);
+
+    const mode = item && item.subtitleMode ? item.subtitleMode : "auto";
+    e.subLang.value = Array.from(e.subLang.options).some((option) => option.value === mode)
+      ? mode
+      : "auto";
+    e.subLang.disabled = !files.length;
+  }
+
+  function activateSubtitleMode(item, mode, automatic) {
+    if (!item) return;
+
+    item.subtitleMode = mode;
+    updateSubtitleLanguageMenu(item);
+
+    if (mode === "off") {
+      state.subtitleEnabled = false;
+      state.cues = [];
+      e.subs.textContent = "";
+      e.subToggle.textContent = "자막 표시 켜기";
+      if (!automatic) showToast("자막 끔");
+      return;
+    }
+
+    const file = resolveSubtitleFile(item);
+    item.subtitleFile = file;
+    state.subtitleEnabled = true;
+    e.subToggle.textContent = "자막 표시 끄기";
+
+    if (file) {
+      loadSRT(file, item.id, automatic);
+    } else {
+      state.cues = [];
+      e.subs.textContent = "";
+      if (!automatic) showToast("연결된 자막이 없어.");
+    }
   }
 
   function compareVideoFiles(a, b) {
@@ -258,19 +387,28 @@
     const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
 
     items.forEach((item) => {
-      if (item.subtitleFile) return;
+      const found = findSubtitlesForVideo(item.file, subtitles);
+      if (!found.length) return;
 
-      const subtitle = findSubtitleForVideo(item.file, subtitles);
-      if (!subtitle) return;
+      const existing = subtitleFilesForItem(item);
+      const keys = new Set(existing.map((file) => fingerprint(file)));
+      const fresh = found.filter((file) => !keys.has(fingerprint(file)));
+      if (!fresh.length) return;
 
-      item.subtitleFile = subtitle;
-      matched += 1;
+      item.subtitleFiles = [...existing, ...fresh];
+      item.subtitleFile = resolveSubtitleFile(item);
+      item.subtitleMode = item.subtitleMode || "auto";
+      matched += fresh.length;
 
       if (item.id === currentId) currentMatched = item;
     });
 
     if (currentMatched) {
-      loadSRT(currentMatched.subtitleFile, currentMatched.id, true);
+      activateSubtitleMode(
+        currentMatched,
+        currentMatched.subtitleMode || "auto",
+        true
+      );
     }
 
     return matched;
@@ -334,11 +472,16 @@
       return;
     }
 
-    const added = files.map((file) => ({
-      file,
-      subtitleFile: findSubtitleForVideo(file, subtitles),
-      id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random())
-    }));
+    const added = files.map((file) => {
+      const subtitleFiles = findSubtitlesForVideo(file, subtitles);
+      return {
+        file,
+        subtitleFiles,
+        subtitleFile: preferredSubtitle(subtitleFiles),
+        subtitleMode: "auto",
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "-" + String(Math.random())
+      };
+    });
 
     const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
     const existingItems = state.items.slice();
@@ -384,7 +527,7 @@
         }, 450);
       }
     } else {
-      const matched = added.filter((item) => item.subtitleFile).length + matchedExisting;
+      const matched = added.reduce((sum, item) => sum + subtitleFilesForItem(item).length, 0) + matchedExisting;
       showToast(
         String(files.length) + "개 파일 추가" +
         (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "") +
@@ -424,9 +567,8 @@
     e.subToggle.textContent = "자막 표시 끄기";
     e.subReset.textContent = "0.0s";
 
-    if (item.subtitleFile) {
-      loadSRT(item.subtitleFile, item.id, true);
-    }
+    updateSubtitleLanguageMenu(item);
+    activateSubtitleMode(item, item.subtitleMode || "auto", true);
 
     function onLoadedMetadata() {
       e.video.removeEventListener("loadedmetadata", onLoadedMetadata);
@@ -839,7 +981,14 @@
   }
 
   function toggleSubtitleVisibility() {
+    const item = state.items[state.index];
+
     if (!state.cues.length) {
+      if (item && subtitleFilesForItem(item).length) {
+        activateSubtitleMode(item, "auto", false);
+        return;
+      }
+
       showToast("연결된 자막이 없어.");
       return;
     }
@@ -1334,15 +1483,28 @@
   e.pip.addEventListener("click", togglePiP);
 
   e.srt.addEventListener("change", (event) => {
-    const file = event.target.files && event.target.files[0];
+    const files = Array.from(event.target.files || []);
     const item = state.items[state.index];
 
-    if (file && item) {
-      item.subtitleFile = file;
-      loadSRT(file, item.id, false);
+    if (files.length && item) {
+      const existing = subtitleFilesForItem(item);
+      const keys = new Set(existing.map((file) => fingerprint(file)));
+      const fresh = files.filter((file) => !keys.has(fingerprint(file)));
+
+      item.subtitleFiles = [...existing, ...fresh];
+      item.subtitleMode = "auto";
+      item.subtitleFile = preferredSubtitle(item.subtitleFiles);
+      updateSubtitleLanguageMenu(item);
+      activateSubtitleMode(item, "auto", false);
     }
 
     event.target.value = "";
+  });
+
+  e.subLang.addEventListener("change", () => {
+    const item = state.items[state.index];
+    if (!item) return;
+    activateSubtitleMode(item, e.subLang.value, false);
   });
 
   e.subToggle.addEventListener("click", toggleSubtitleVisibility);
