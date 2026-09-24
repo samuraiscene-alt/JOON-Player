@@ -1784,7 +1784,8 @@
   e.pip.addEventListener("click", togglePiP);
 
   e.srt.addEventListener("change", (event) => {
-    const files = Array.from(event.target.files || []);
+    const files = Array.from(event.target.files || [])
+      .filter((file) => /\.(srt|smi)$/i.test(file.name));
     const item = state.items[state.index];
 
     if (files.length && item) {
