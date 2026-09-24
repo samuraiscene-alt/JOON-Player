@@ -1203,7 +1203,7 @@
       if (error && error.code === "SUBTITLE_DAMAGED") {
         state.cues = [];
         e.subs.textContent = "";
-        showToast("자막 파일이 이미 손상되어 있어. 다른 SRT/SMI 파일을 사용해줘.", 3200);
+        showToast("자막 파일이 손상되었습니다.", 2200);
         return;
       }
 
