@@ -28,6 +28,7 @@
     .feedback{position:absolute;z-index:12;top:48%;left:50%;transform:translate(-50%,-50%);padding:10px 14px;border-radius:15px;background:#0b0d12cc;font-weight:800}.unlock{position:absolute;z-index:15;left:max(18px,env(safe-area-inset-left));top:50%;transform:translateY(-50%);width:52px;height:52px;padding:0;border:0;border-radius:50%;display:grid;place-items:center;color:#fff;background:#12151ce6;backdrop-filter:blur(12px)}.unlock svg,#lock svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
     .sheet{position:fixed;z-index:30;left:0;right:0;bottom:0;max-height:78dvh;overflow:auto;padding:8px 16px calc(18px + env(safe-area-inset-bottom));border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;background:#12151cf5}.sheet-head{display:flex;align-items:center;justify-content:space-between;position:sticky;top:-8px;background:#12151cf5;padding:8px 0}.handle{width:42px;height:5px;border-radius:99px;background:#ffffff2a;margin:0 auto 6px}
     .group{display:grid;gap:12px;padding:15px 0;border-top:1px solid var(--line)}.group h2{font-size:13px;color:#ffffffbd;margin:0}.setting{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}.setting.stack{align-items:stretch;flex-direction:column}.chips,.mini{display:flex;gap:7px;flex-wrap:wrap}.chips button,.mini button,.action,.tools button{min-height:40px;padding:0 12px;border-radius:12px;background:#ffffff12}.chips .on{background:#fff;color:#05070b;font-weight:800}.action{display:grid;place-items:center;width:100%}
+    .settings-sheet{padding-left:0;padding-right:0;max-height:88dvh}.settings-sheet .sheet-head{padding:10px 18px;border-bottom:1px solid var(--line)}.settings-sheet .handle{margin-bottom:2px}.settings-section{padding:0}.settings-section h2{margin:0;padding:18px 20px 8px;font-size:12px;font-weight:700;color:#ffffff78;letter-spacing:.02em}.settings-row,.settings-action{width:100%;min-height:58px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-top:1px solid #ffffff10;background:transparent;text-align:left}.settings-row>span:first-child,.settings-action>span:first-child{font-size:16px;font-weight:650}.settings-row select{max-width:52%;border:0;background:#ffffff0d;border-radius:10px;padding:8px 10px;text-align:right;color:#fff}.settings-row .mini,.settings-row .chips{justify-content:flex-end}.settings-row .chips{max-width:66%}.settings-row .chips button{min-height:34px;padding:0 10px;border-radius:10px}.settings-row .mini button{min-width:42px;min-height:36px;border-radius:10px}.settings-action{font:inherit;color:#fff}.settings-action .chev{font-size:26px;font-weight:400;color:#ffffff62}.switch{position:relative;display:inline-flex;flex:0 0 auto;width:51px;height:31px}.switch input{position:absolute;opacity:0;pointer-events:none}.switch span{position:absolute;inset:0;border-radius:999px;background:#6a6b70;transition:.18s}.switch span::after{content:"";position:absolute;width:27px;height:27px;left:2px;top:2px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0007;transition:.18s}.switch input:checked+span{background:#ff5a1f}.switch input:checked+span::after{transform:translateX(20px)}.switch input:focus-visible+span{outline:2px solid #fff;outline-offset:2px}.settings-note{padding:10px 20px 4px;color:#ffffff66;font-size:12px;line-height:1.45}
     .list{display:grid;gap:7px;padding:0;margin:0;list-style:none}.item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;padding:9px 10px;border-radius:14px;background:#ffffff0f}.item.current{outline:1px solid #ffffff66}.item button{min-height:42px;background:transparent;text-align:left}.item-title-row{display:flex;align-items:center;gap:10px;min-width:0}.item-title-row strong{display:block;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item small{display:block;color:var(--muted);margin-top:3px}.watch-progress{display:block;flex:0 0 clamp(88px,24vw,160px);height:12px;margin:0;border-radius:999px;overflow:hidden;background:#ffffff24}.watch-progress-fill{display:block;width:0;height:100%;border-radius:inherit;background:#5eb7ff;transition:width .35s linear}
     .tools{display:flex;gap:7px;flex-wrap:wrap;padding-bottom:12px}.toast{position:fixed;z-index:50;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);max-width:88vw;padding:10px 14px;border-radius:13px;background:#1c2029ee;text-align:center}.error-modal{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:24px;background:#0009;backdrop-filter:blur(8px)}.error-card{width:min(100%,360px);padding:22px;border:1px solid #ffffff1c;border-radius:22px;background:#151820;box-shadow:0 18px 60px #0008;text-align:center}.error-card h2{margin:0 0 10px;font-size:19px}.error-card p{margin:0;color:var(--muted);line-height:1.55}.error-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px}.error-card button{width:100%;min-height:46px;margin:0;border-radius:14px;background:#fff;color:#05070b;font-weight:800}.error-card #errorOk{background:#ffffff14;color:#fff}.notice{padding:10px 14px;color:var(--muted);font-size:12px;line-height:1.5}
     [hidden]{display:none!important}@media(orientation:landscape){header{display:flex}.stage{height:calc(100svh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0}.stage video{height:100%;min-height:0}.controls{padding:max(10px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left))}.bottom{gap:8px}.timeline{grid-template-columns:56px 1fr 56px}.stage.web-fullscreen,.stage.web-fullscreen video{height:100svh;min-height:100svh}.stage.web-fullscreen .controls{padding:max(12px,env(safe-area-inset-top)) max(22px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(22px,env(safe-area-inset-left))}}
@@ -54,22 +55,76 @@
       </div>
     </div>
   </section>
-  <aside id="settings" class="sheet" hidden><div class="handle"></div><div class="sheet-head"><strong>빠른 설정</strong><button data-close="settings" class="icon">✕</button></div>
-    <div class="group"><h2>재생</h2>
-      <div class="setting stack"><span>재생 속도</span><div id="rates" class="chips"><button data-rate=".75">0.75x</button><button data-rate="1" class="on">1x</button><button data-rate="1.25">1.25x</button><button data-rate="1.5">1.5x</button><button data-rate="2">2x</button></div></div>
-      <div class="setting stack"><span>화면비율</span><div id="fits" class="chips"><button data-fit="contain" class="on">원본</button><button data-fit="fill">맞춤</button><button data-fit="cover">채우기</button></div></div>
-      <div class="setting"><span>A-B 반복</span><div class="mini"><button id="setA">A</button><button id="setB">B</button><button id="clearAB">해제</button></div></div>
-      <div class="setting"><span>취침 타이머</span><select id="sleep"><option value="off">끔</option><option value="15">15분</option><option value="30">30분</option><option value="60">60분</option><option value="end">현재 영상 끝</option></select></div>
-      <button id="restartCurrent" class="action">처음부터 재생</button>
-      <button id="pip" class="action">PiP 시작</button>
+  <aside id="settings" class="sheet settings-sheet" hidden>
+    <div class="handle"></div>
+    <div class="sheet-head"><strong>설정</strong><button data-close="settings" class="icon">✕</button></div>
+
+    <div class="settings-section">
+      <h2>재생</h2>
+
+      <div class="settings-row">
+        <span>이어보기</span>
+        <label class="switch"><input id="resumeToggle" type="checkbox" checked><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>다음 영상 자동 재생</span>
+        <label class="switch"><input id="autoNextToggle" type="checkbox" checked><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>재생 속도</span>
+        <div id="rates" class="chips"><button data-rate=".75">0.75x</button><button data-rate="1" class="on">1x</button><button data-rate="1.25">1.25x</button><button data-rate="1.5">1.5x</button><button data-rate="2">2x</button></div>
+      </div>
+
+      <div class="settings-row">
+        <span>화면 비율</span>
+        <div id="fits" class="chips"><button data-fit="contain" class="on">원본</button><button data-fit="fill">맞춤</button><button data-fit="cover">채우기</button></div>
+      </div>
+
+      <div class="settings-row">
+        <span>A-B 반복</span>
+        <div class="mini"><button id="setA">A</button><button id="setB">B</button><button id="clearAB">해제</button></div>
+      </div>
+
+      <div class="settings-row">
+        <span>취침 타이머</span>
+        <select id="sleep"><option value="off">끔</option><option value="15">15분</option><option value="30">30분</option><option value="60">60분</option><option value="end">현재 영상 끝</option></select>
+      </div>
+
+      <button id="restartCurrent" class="settings-action"><span>처음부터 재생</span><span class="chev">›</span></button>
+      <button id="pip" class="settings-action"><span>PiP 시작</span><span class="chev">›</span></button>
     </div>
-    <div class="group"><h2>자막</h2>
-      <label class="action">SRT 파일 선택<input id="srt" type="file" accept=".srt,text/plain" multiple hidden></label>
-      <div class="setting"><span>자막 언어</span><select id="subLang"><option value="auto">자동</option><option value="off">끔</option></select></div>
-      <button id="subToggle" class="action">자막 표시 끄기</button>
-      <div class="setting"><span>싱크</span><div class="mini"><button id="subMinus">−0.1</button><button id="subReset">0.0s</button><button id="subPlus">+0.1</button></div></div>
-      <div class="setting"><span>크기</span><div class="mini"><button id="subSmall">−</button><button id="subSize">100%</button><button id="subLarge">＋</button></div></div>
-      <div class="setting"><span>위치</span><select id="subPos"><option value="low">기본</option><option value="mid">위로</option><option value="high">더 위로</option></select></div>
+
+    <div class="settings-section">
+      <h2>자막</h2>
+
+      <label class="settings-action"><span>SRT 파일 선택</span><span class="chev">›</span><input id="srt" type="file" accept=".srt,text/plain" multiple hidden></label>
+
+      <div class="settings-row">
+        <span>자막 표시</span>
+        <label class="switch"><input id="subToggle" type="checkbox" checked><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>자막 언어</span>
+        <select id="subLang"><option value="auto">자동</option><option value="off">끔</option></select>
+      </div>
+
+      <div class="settings-row">
+        <span>싱크</span>
+        <div class="mini"><button id="subMinus">−0.1</button><button id="subReset">0.0s</button><button id="subPlus">+0.1</button></div>
+      </div>
+
+      <div class="settings-row">
+        <span>크기</span>
+        <div class="mini"><button id="subSmall">−</button><button id="subSize">100%</button><button id="subLarge">＋</button></div>
+      </div>
+
+      <div class="settings-row">
+        <span>위치</span>
+        <select id="subPos"><option value="low">기본</option><option value="mid">위로</option><option value="high">더 위로</option></select>
+      </div>
     </div>
   </aside>
   <aside id="queue" class="sheet" hidden><div class="handle"></div><div class="sheet-head"><strong>재생 목록</strong><button data-close="queue" class="icon">✕</button></div><div class="tools"><button id="repeat">반복 끔</button><button id="shuffle">셔플 끔</button><button id="add">파일 추가</button><button id="addFolder">폴더 추가</button><button id="resetProgress">시청기록 초기화</button><button id="clearQueue">목록 비우기</button></div><ol id="list" class="list"></ol></aside>
