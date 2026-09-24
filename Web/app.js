@@ -2,12 +2,14 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
     rate: "jp.web.rate",
     fit: "jp.web.fit",
+    resumeEnabled: "jp.web.resumeEnabled",
+    autoNext: "jp.web.autoNext",
     subSize: "jp.web.subSize",
     subPos: "jp.web.subPos",
     resume: "jp.web.resume.",
@@ -21,6 +23,8 @@
     objectURL: null,
     repeat: "off",
     shuffle: false,
+    resumeEnabled: localStorage.getItem(K.resumeEnabled) !== "0",
+    autoNext: localStorage.getItem(K.autoNext) !== "0",
     locked: false,
     hideTimer: null,
     toastTimer: null,
@@ -333,14 +337,14 @@
       state.subtitleEnabled = false;
       state.cues = [];
       e.subs.textContent = "";
-      e.subToggle.textContent = "자막 표시 켜기";
+      e.subToggle.checked = false;
       return;
     }
 
     const file = resolveSubtitleFile(item);
     item.subtitleFile = file;
     state.subtitleEnabled = true;
-    e.subToggle.textContent = "자막 표시 끄기";
+    e.subToggle.checked = true;
 
     if (file) {
       loadSRT(file, item.id, automatic);
@@ -565,7 +569,7 @@
     state.subtitleEnabled = true;
     state.subtitleDelay = 0;
     e.subs.textContent = "";
-    e.subToggle.textContent = "자막 표시 끄기";
+    e.subToggle.checked = true;
     e.subReset.textContent = "0.0s";
 
     updateSubtitleLanguageMenu(item);
@@ -584,7 +588,7 @@
       e.seek.max = String(e.video.duration || 1);
       e.dur.textContent = formatTime(e.video.duration);
 
-      if (allowResume !== false) {
+      if (state.resumeEnabled && allowResume !== false) {
         const stored = Number(localStorage.getItem(K.resume + fingerprint(item.file)) || 0);
         if (stored >= 10 && Number.isFinite(e.video.duration) && e.video.duration - stored >= 30) {
           e.video.currentTime = stored;
@@ -823,8 +827,11 @@
     if (current >= 1) localStorage.setItem(progressKey, String(ratio));
     else localStorage.removeItem(progressKey);
 
-    if (current >= 10 && remaining >= 30) localStorage.setItem(resumeKey, String(current));
-    else localStorage.removeItem(resumeKey);
+    if (state.resumeEnabled && current >= 10 && remaining >= 30) {
+      localStorage.setItem(resumeKey, String(current));
+    } else {
+      localStorage.removeItem(resumeKey);
+    }
   }
 
   function updateTimeline() {
@@ -988,21 +995,21 @@
 
   function toggleSubtitleVisibility() {
     const item = state.items[state.index];
+    const enabled = Boolean(e.subToggle.checked);
 
-    if (!state.cues.length) {
+    if (enabled && !state.cues.length) {
       if (item && subtitleFilesForItem(item).length) {
-        activateSubtitleMode(item, "auto", false);
+        activateSubtitleMode(item, item.subtitleMode === "off" ? "auto" : (item.subtitleMode || "auto"), false);
         return;
       }
 
+      e.subToggle.checked = false;
+      state.subtitleEnabled = false;
       showToast("연결된 자막이 없어.");
       return;
     }
 
-    state.subtitleEnabled = !state.subtitleEnabled;
-    e.subToggle.textContent = state.subtitleEnabled
-      ? "자막 표시 끄기"
-      : "자막 표시 켜기";
+    state.subtitleEnabled = enabled;
     updateSubtitle();
   }
 
@@ -1529,6 +1536,22 @@
     button.addEventListener("click", () => { $(button.dataset.close).hidden = true; });
   });
 
+  e.resumeToggle.addEventListener("change", () => {
+    state.resumeEnabled = Boolean(e.resumeToggle.checked);
+    localStorage.setItem(K.resumeEnabled, state.resumeEnabled ? "1" : "0");
+
+    if (!state.resumeEnabled) {
+      state.items.forEach((item) => {
+        localStorage.removeItem(K.resume + fingerprint(item.file));
+      });
+    }
+  });
+
+  e.autoNextToggle.addEventListener("change", () => {
+    state.autoNext = Boolean(e.autoNextToggle.checked);
+    localStorage.setItem(K.autoNext, state.autoNext ? "1" : "0");
+  });
+
   e.rates.addEventListener("click", (event) => {
     const button = event.target.closest("[data-rate]");
     if (button) setPlaybackRate(button.dataset.rate, true);
@@ -1590,7 +1613,7 @@
     activateSubtitleMode(item, e.subLang.value, false);
   });
 
-  e.subToggle.addEventListener("click", toggleSubtitleVisibility);
+  e.subToggle.addEventListener("change", toggleSubtitleVisibility);
   e.subMinus.addEventListener("click", () => adjustSubtitleDelay(-0.1));
   e.subPlus.addEventListener("click", () => adjustSubtitleDelay(0.1));
 
@@ -1700,6 +1723,11 @@
       return;
     }
 
+    if (!state.autoNext && state.repeat !== "one") {
+      showControls(true);
+      return;
+    }
+
     next(true);
   });
 
@@ -1799,6 +1827,9 @@
     }
   });
 
+  e.resumeToggle.checked = state.resumeEnabled;
+  e.autoNextToggle.checked = state.autoNext;
+  e.subToggle.checked = state.subtitleEnabled;
   setPlaybackRate(Number(localStorage.getItem(K.rate) || 1), false);
   setFit(localStorage.getItem(K.fit) || "contain", false);
   handlePlayerOrientationChange();
