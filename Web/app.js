@@ -493,7 +493,11 @@
     }
 
     const added = files.map((file) => {
-      const subtitleFiles = findSubtitlesForVideo(file, subtitles);
+      const subtitleFiles =
+        files.length === 1 && subtitles.length
+          ? subtitles
+          : findSubtitlesForVideo(file, subtitles);
+
       return {
         file,
         subtitleFiles,
