@@ -1,4 +1,4 @@
-const CACHE = "joon-player-web-v10";
+const CACHE = "joon-player-web-v11";
 const SHELL = [
   "./",
   "./index.html",
