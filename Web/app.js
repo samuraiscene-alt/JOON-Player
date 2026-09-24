@@ -1262,7 +1262,7 @@
   }
 
   function setSubtitleSize(value) {
-    state.subtitleSize = clamp(Math.round(value / 10) * 10, 60, 180);
+    state.subtitleSize = clamp(Math.round(value / 10) * 10, 100, 180);
     e.subs.style.fontSize = String(state.subtitleSize) + "%";
     e.subSize.textContent = String(state.subtitleSize) + "%";
     localStorage.setItem(K.subSize, String(state.subtitleSize));
