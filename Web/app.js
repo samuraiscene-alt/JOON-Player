@@ -2,12 +2,13 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rates","fits","setA","setB","clearAB","sleep","restartCurrent","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rates","aspectRatio","setA","setB","clearAB","sleep","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
     rate: "jp.web.rate",
     fit: "jp.web.fit",
+    aspectRatio: "jp.web.aspectRatio",
     resumeEnabled: "jp.web.resumeEnabled",
     autoNext: "jp.web.autoNext",
     subSize: "jp.web.subSize",
@@ -25,6 +26,7 @@
     shuffle: false,
     resumeEnabled: localStorage.getItem(K.resumeEnabled) !== "0",
     autoNext: localStorage.getItem(K.autoNext) !== "0",
+    aspectRatio: localStorage.getItem(K.aspectRatio) || "auto",
     locked: false,
     hideTimer: null,
     toastTimer: null,
@@ -562,6 +564,7 @@
     e.player.hidden = false;
     e.resumeSession.hidden = false;
     document.body.classList.add("player-active");
+    requestAnimationFrame(applyAspectRatio);
 
     state.a = null;
     state.b = null;
@@ -798,13 +801,59 @@
 
     e.stage.dataset.fit = effective;
     if (persist !== false) localStorage.setItem(K.fit, requested);
+  }
 
-    e.fits.querySelectorAll("[data-fit]").forEach((button) => {
-      button.classList.toggle("on", button.dataset.fit === effective);
-    });
+  function aspectRatioNumber(value) {
+    if (value === "16:9") return 16 / 9;
+    if (value === "4:3") return 4 / 3;
+    if (value === "21:9") return 21 / 9;
+    if (value === "2.35:1") return 2.35;
+    return null;
+  }
 
-    if (persist !== false && isPortrait() && requested !== "contain") {
+  function applyAspectRatio() {
+    const ratio = aspectRatioNumber(state.aspectRatio);
+
+    if (!ratio) {
+      e.stage.dataset.aspectActive = "0";
+      e.video.style.position = "";
+      e.video.style.left = "";
+      e.video.style.top = "";
+      e.video.style.transform = "";
+      e.video.style.width = "";
+      e.video.style.height = "";
+      return;
     }
+
+    const rect = e.stage.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    let width = rect.width;
+    let height = width / ratio;
+
+    if (height > rect.height) {
+      height = rect.height;
+      width = height * ratio;
+    }
+
+    e.stage.dataset.aspectActive = "1";
+    e.video.style.position = "absolute";
+    e.video.style.left = "50%";
+    e.video.style.top = "50%";
+    e.video.style.transform = "translate(-50%, -50%)";
+    e.video.style.width = width + "px";
+    e.video.style.height = height + "px";
+  }
+
+  function setAspectRatio(value, persist) {
+    state.aspectRatio = value || "auto";
+    e.aspectRatio.value = state.aspectRatio;
+
+    if (persist !== false) {
+      localStorage.setItem(K.aspectRatio, state.aspectRatio);
+    }
+
+    requestAnimationFrame(applyAspectRatio);
   }
 
   function persistResume(force) {
@@ -1103,6 +1152,7 @@
     e.full.setAttribute("aria-label", enabled ? "전체화면 종료" : "전체화면");
     showControls(true);
     scheduleHide();
+    requestAnimationFrame(applyAspectRatio);
 
     if (!enabled) unlockOrientation();
   }
@@ -1157,6 +1207,8 @@
       setWebFullscreen(true);
       tryLockLandscape();
     }
+
+    requestAnimationFrame(applyAspectRatio);
   }
 
   function cycleRepeat() {
@@ -1557,9 +1609,8 @@
     if (button) setPlaybackRate(button.dataset.rate, true);
   });
 
-  e.fits.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-fit]");
-    if (button) setFit(button.dataset.fit, true);
+  e.aspectRatio.addEventListener("change", () => {
+    setAspectRatio(e.aspectRatio.value, true);
   });
 
   e.setA.addEventListener("click", () => setAB("a"));
@@ -1571,20 +1622,6 @@
   });
 
   e.sleep.addEventListener("change", () => setSleepTimer(e.sleep.value));
-
-  e.restartCurrent.addEventListener("click", () => {
-    const item = state.items[state.index];
-    if (!item) return;
-
-    const key = fingerprint(item.file);
-    localStorage.removeItem(K.resume + key);
-    localStorage.removeItem(K.progress + key);
-
-    e.video.currentTime = 0;
-    updatePlaylistProgress(item, 0);
-    closeSheets();
-    e.video.play().catch(() => {});
-  });
 
   e.pip.addEventListener("click", togglePiP);
 
@@ -1830,8 +1867,10 @@
   e.resumeToggle.checked = state.resumeEnabled;
   e.autoNextToggle.checked = state.autoNext;
   e.subToggle.checked = state.subtitleEnabled;
+  e.aspectRatio.value = state.aspectRatio;
   setPlaybackRate(Number(localStorage.getItem(K.rate) || 1), false);
   setFit(localStorage.getItem(K.fit) || "contain", false);
+  setAspectRatio(state.aspectRatio, false);
   handlePlayerOrientationChange();
   setSubtitleSize(state.subtitleSize);
   setSubtitlePosition(state.subtitlePosition);
