@@ -1004,6 +1004,25 @@
 
   }
 
+  function assertSubtitleNotDamaged(bytes) {
+    let replacementCount = 0;
+
+    for (let i = 0; i <= bytes.length - 3; i += 1) {
+      if (bytes[i] === 0xef && bytes[i + 1] === 0xbf && bytes[i + 2] === 0xbd) {
+        replacementCount += 1;
+        i += 2;
+      }
+    }
+
+    const threshold = Math.max(20, Math.floor(bytes.length / 1000));
+    if (replacementCount >= threshold) {
+      const error = new Error("SUBTITLE_DAMAGED");
+      error.code = "SUBTITLE_DAMAGED";
+      error.replacementCount = replacementCount;
+      throw error;
+    }
+  }
+
   function subtitleDecodeScore(text) {
     const value = String(text || "");
     const replacement = (value.match(/\uFFFD/g) || []).length;
@@ -1017,6 +1036,7 @@
 
   async function readSubtitleText(file) {
     const bytes = new Uint8Array(await file.arrayBuffer());
+    assertSubtitleNotDamaged(bytes);
 
     if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
       return new TextDecoder("utf-8").decode(bytes.subarray(3));
@@ -1179,7 +1199,14 @@
       state.subtitleDelay = 0;
       e.subReset.textContent = "0.0s";
 
-    } catch {
+    } catch (error) {
+      if (error && error.code === "SUBTITLE_DAMAGED") {
+        state.cues = [];
+        e.subs.textContent = "";
+        showToast("자막 파일이 이미 손상되어 있어. 다른 SRT/SMI 파일을 사용해줘.", 3200);
+        return;
+      }
+
       showToast("자막 파일을 읽지 못했어.");
     }
   }
