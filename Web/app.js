@@ -1001,6 +1001,17 @@
 
   }
 
+  function subtitleDecodeScore(text) {
+    const value = String(text || "");
+    const replacement = (value.match(/\uFFFD/g) || []).length;
+    const nul = (value.match(/\u0000/g) || []).length;
+    const hangul = (value.match(/[가-힣]/g) || []).length;
+    const cjk = (value.match(/[一-龯ぁ-んァ-ン]/g) || []).length;
+    const controls = (value.match(/[\u0001-\u0008\u000B\u000C\u000E-\u001F]/g) || []).length;
+
+    return (hangul * 8) + (cjk * 2) - (replacement * 40) - (nul * 20) - (controls * 10);
+  }
+
   async function readSubtitleText(file) {
     const bytes = new Uint8Array(await file.arrayBuffer());
 
@@ -1016,15 +1027,58 @@
       return new TextDecoder("utf-16be").decode(bytes.subarray(2));
     }
 
-    try {
-      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-    } catch {
-      try {
-        return new TextDecoder("euc-kr", { fatal: true }).decode(bytes);
-      } catch {
-        return new TextDecoder("utf-8").decode(bytes);
-      }
+    const probe = new TextDecoder("windows-1252").decode(bytes.subarray(0, Math.min(bytes.length, 8192)));
+    const declared = (probe.match(/charset\s*=\s*["']?([^"'\s;>]+)/i) || [])[1] || "";
+
+    if (/^(?:euc-kr|ks_c_5601-1987|ks_c_5601|cp949|ms949|windows-949)$/i.test(declared)) {
+      return new TextDecoder("euc-kr").decode(bytes);
     }
+
+    if (/^utf-?8$/i.test(declared)) {
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+
+    const evenNulls = bytes.filter((value, index) => index % 2 === 0 && value === 0).length;
+    const oddNulls = bytes.filter((value, index) => index % 2 === 1 && value === 0).length;
+    const samplePairs = Math.max(1, Math.floor(Math.min(bytes.length, 4096) / 2));
+
+    if (oddNulls / samplePairs > 0.25) {
+      return new TextDecoder("utf-16le").decode(bytes);
+    }
+
+    if (evenNulls / samplePairs > 0.25) {
+      return new TextDecoder("utf-16be").decode(bytes);
+    }
+
+    const candidates = [];
+
+    try {
+      candidates.push({
+        name: "utf-8",
+        text: new TextDecoder("utf-8").decode(bytes)
+      });
+    } catch {}
+
+    try {
+      candidates.push({
+        name: "euc-kr",
+        text: new TextDecoder("euc-kr").decode(bytes)
+      });
+    } catch {}
+
+    if (!candidates.length) {
+      return new TextDecoder("utf-8").decode(bytes);
+    }
+
+    candidates.sort((a, b) => {
+      const scoreDiff = subtitleDecodeScore(b.text) - subtitleDecodeScore(a.text);
+      if (scoreDiff) return scoreDiff;
+      if (a.name === "utf-8") return -1;
+      if (b.name === "utf-8") return 1;
+      return 0;
+    });
+
+    return candidates[0].text;
   }
 
   function parseSRT(text) {
