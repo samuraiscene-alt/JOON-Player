@@ -71,7 +71,8 @@
     orientationTimer: null,
     pendingLandscapeFullscreen: false,
     orientationLockActive: false,
-    controlsInteracting: false
+    controlsInteracting: false,
+    settingsWasPlaying: false
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -114,6 +115,27 @@
   function closeSheets() {
     e.settings.hidden = true;
     e.queue.hidden = true;
+  }
+
+  function openSettings() {
+    state.settingsWasPlaying = !e.video.paused && !e.video.ended;
+
+    if (state.settingsWasPlaying) {
+      e.video.pause();
+    }
+
+    openSheet(e.settings);
+  }
+
+  function closeSettings() {
+    e.settings.hidden = true;
+
+    const shouldResume = state.settingsWasPlaying;
+    state.settingsWasPlaying = false;
+
+    if (shouldResume) {
+      e.video.play().catch(() => showToast("재생을 다시 시작할 수 없어."));
+    }
   }
 
   function scrollCurrentPlaylistItem() {
@@ -1848,11 +1870,18 @@
   });
 
   e.full.addEventListener("click", toggleFullscreen);
-  e.settingsBtn.addEventListener("click", () => openSheet(e.settings));
+  e.settingsBtn.addEventListener("click", openSettings);
   e.queueBtn.addEventListener("click", () => openSheet(e.queue));
 
   document.querySelectorAll("[data-close]").forEach((button) => {
-    button.addEventListener("click", () => { $(button.dataset.close).hidden = true; });
+    button.addEventListener("click", () => {
+      if (button.dataset.close === "settings") {
+        closeSettings();
+        return;
+      }
+
+      $(button.dataset.close).hidden = true;
+    });
   });
 
   e.resumeToggle.addEventListener("change", () => {
