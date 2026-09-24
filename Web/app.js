@@ -636,6 +636,7 @@
         }
       }
 
+      applySubtitlePosition();
       e.video.play().catch(() => {});
       scheduleHide();
     }
@@ -885,6 +886,7 @@
       e.video.style.transform = "";
       e.video.style.width = "";
       e.video.style.height = "";
+      requestAnimationFrame(applySubtitlePosition);
       return;
     }
 
@@ -906,6 +908,7 @@
     e.video.style.transform = "translate(-50%, -50%)";
     e.video.style.width = width + "px";
     e.video.style.height = height + "px";
+    requestAnimationFrame(applySubtitlePosition);
   }
 
   function setAspectRatio(value, persist) {
@@ -1285,14 +1288,48 @@
     localStorage.setItem(K.subSize, String(state.subtitleSize));
   }
 
+  function applySubtitlePosition() {
+    const step = state.subtitlePosition;
+
+    e.subs.className = "subs";
+
+    if (isPortrait() && e.video.videoWidth && e.video.videoHeight) {
+      const stageRect = e.stage.getBoundingClientRect();
+      if (!stageRect.width || !stageRect.height) return;
+
+      const forcedRatio = aspectRatioNumber(state.aspectRatio);
+      const videoRatio = forcedRatio || (e.video.videoWidth / e.video.videoHeight);
+
+      let renderedHeight = stageRect.width / videoRatio;
+      if (renderedHeight > stageRect.height) {
+        renderedHeight = stageRect.height;
+      }
+
+      const videoBottom = (stageRect.height + renderedHeight) / 2;
+      const gap = 8;
+      const stepPixels = Math.max(8, stageRect.height * 0.02);
+      const top = clamp(
+        videoBottom + gap - (step * stepPixels),
+        4,
+        stageRect.height - 72
+      );
+
+      e.subs.style.bottom = "auto";
+      e.subs.style.top = String(top) + "px";
+      return;
+    }
+
+    const bottom = 14 + (step * 2);
+    e.subs.style.top = "";
+    e.subs.style.bottom = String(bottom) + "%";
+  }
+
   function setSubtitlePosition(value) {
     const step = clamp(Math.round(Number(value) || 0), -6, 13);
-    const bottom = 14 + (step * 2);
     state.subtitlePosition = step;
-    e.subs.className = "subs";
-    e.subs.style.bottom = String(bottom) + "%";
     e.subPos.textContent = step > 0 ? "+" + String(step) : String(step);
     localStorage.setItem(K.subPos, String(step));
+    applySubtitlePosition();
   }
 
   function setSkipIntervals() {
