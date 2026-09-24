@@ -1287,6 +1287,7 @@
     state.subtitleSize = clamp(Math.round(value / 10) * 10, 100, 180);
     e.subs.style.fontSize = String(state.subtitleSize) + "%";
     e.subSize.textContent = String(state.subtitleSize) + "%";
+    e.subSmall.disabled = state.subtitleSize <= 100;
     localStorage.setItem(K.subSize, String(state.subtitleSize));
   }
 
