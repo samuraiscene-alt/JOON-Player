@@ -14,7 +14,7 @@
     rewInterval: "jp.web.rewInterval",
     fwdInterval: "jp.web.fwdInterval",
     subSize: "jp.web.subSize",
-    subPos: "jp.web.subPos",
+    subPos: "jp.web.subPosStep",
     subLineHeight: "jp.web.subLineHeight",
     subOutline: "jp.web.subOutline",
     subShadow: "jp.web.subShadow",
@@ -51,14 +51,7 @@
     subtitleEnabled: true,
     subtitleDelay: 0,
     subtitleSize: Number(localStorage.getItem(K.subSize) || 100),
-    subtitlePosition: (() => {
-      const saved = localStorage.getItem(K.subPos);
-      if (saved === "mid") return 24;
-      if (saved === "high") return 34;
-      if (saved === "low" || saved === null) return 14;
-      const value = Number(saved);
-      return Number.isFinite(value) ? value : 14;
-    })(),
+    subtitlePosition: Number(localStorage.getItem(K.subPos) || 0),
     brightness: 1,
     gesture: null,
     holdTimer: null,
@@ -1284,20 +1277,21 @@
   }
 
   function setSubtitleSize(value) {
-    state.subtitleSize = clamp(Math.round(value / 10) * 10, 100, 180);
+    state.subtitleSize = clamp(Math.round(value / 10) * 10, 90, 180);
     e.subs.style.fontSize = String(state.subtitleSize) + "%";
-    e.subSize.textContent = String(state.subtitleSize) + "%";
-    e.subSmall.disabled = state.subtitleSize <= 100;
+    e.subSize.textContent = String(state.subtitleSize);
+    e.subSmall.disabled = state.subtitleSize <= 90;
     localStorage.setItem(K.subSize, String(state.subtitleSize));
   }
 
   function setSubtitlePosition(value) {
-    const position = clamp(Math.round(Number(value) / 2) * 2, 2, 40);
-    state.subtitlePosition = position;
+    const step = clamp(Math.round(Number(value) || 0), -6, 13);
+    const bottom = 14 + (step * 2);
+    state.subtitlePosition = step;
     e.subs.className = "subs";
-    e.subs.style.bottom = String(position) + "%";
-    e.subPos.textContent = String(position) + "%";
-    localStorage.setItem(K.subPos, String(position));
+    e.subs.style.bottom = String(bottom) + "%";
+    e.subPos.textContent = step > 0 ? "+" + String(step) : String(step);
+    localStorage.setItem(K.subPos, String(step));
   }
 
   function setSkipIntervals() {
@@ -1964,9 +1958,9 @@
   e.subSmall.addEventListener("click", () => setSubtitleSize(state.subtitleSize - 10));
   e.subLarge.addEventListener("click", () => setSubtitleSize(state.subtitleSize + 10));
   e.subSize.addEventListener("click", () => setSubtitleSize(100));
-  e.subPosMinus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition - 2));
-  e.subPos.addEventListener("click", () => setSubtitlePosition(14));
-  e.subPosPlus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition + 2));
+  e.subPosMinus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition - 1));
+  e.subPos.addEventListener("click", () => setSubtitlePosition(0));
+  e.subPosPlus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition + 1));
   e.subLineHeight.addEventListener("change", saveSubtitleStyle);
   e.subOutline.addEventListener("change", saveSubtitleStyle);
   e.subShadow.addEventListener("change", saveSubtitleStyle);
