@@ -42,7 +42,9 @@
     tapTimer: null,
     lastResumeSave: 0,
     wakeLock: null,
-    mediaLoadToken: 0
+    mediaLoadToken: 0,
+    pendingLandscapeFullscreen: false,
+    orientationLockActive: false
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -783,13 +785,24 @@
     });
   }
 
+  function isPortrait() {
+    return window.matchMedia("(orientation: portrait)").matches;
+  }
+
   function setFit(value, persist) {
-    e.stage.dataset.fit = value;
-    if (persist !== false) localStorage.setItem(K.fit, value);
+    const requested = value || "contain";
+    const effective = isPortrait() ? "contain" : requested;
+
+    e.stage.dataset.fit = effective;
+    if (persist !== false) localStorage.setItem(K.fit, requested);
 
     e.fits.querySelectorAll("[data-fit]").forEach((button) => {
-      button.classList.toggle("on", button.dataset.fit === value);
+      button.classList.toggle("on", button.dataset.fit === effective);
     });
+
+    if (persist !== false && isPortrait() && requested !== "contain") {
+      showToast("세로 화면에서는 원본 비율로 표시돼.");
+    }
   }
 
   function persistResume(force) {
@@ -1053,17 +1066,100 @@
     }
   }
 
-  function setWebFullscreen(value) {
+  async function tryLockLandscape() {
+    if (!screen.orientation || !screen.orientation.lock) return false;
+
+    try {
+      await screen.orientation.lock("landscape");
+      state.orientationLockActive = true;
+      return true;
+    } catch {
+      state.orientationLockActive = false;
+      return false;
+    }
+  }
+
+  function unlockOrientation() {
+    if (!screen.orientation || !screen.orientation.unlock) {
+      state.orientationLockActive = false;
+      return;
+    }
+
+    try {
+      screen.orientation.unlock();
+    } catch {}
+
+    state.orientationLockActive = false;
+  }
+
+  function setWebFullscreen(value, keepPending) {
     const enabled = Boolean(value);
+
+    if (!enabled && !keepPending) {
+      state.pendingLandscapeFullscreen = false;
+    }
+
     e.stage.classList.toggle("web-fullscreen", enabled);
     document.body.classList.toggle("player-fullscreen", enabled);
     e.full.setAttribute("aria-label", enabled ? "전체화면 종료" : "전체화면");
     showControls(true);
     scheduleHide();
+
+    if (!enabled) unlockOrientation();
+  }
+
+  async function enterLandscapeFullscreen() {
+    setFit(localStorage.getItem(K.fit) || "contain", false);
+
+    if (isPortrait()) {
+      state.pendingLandscapeFullscreen = true;
+
+      const locked = await tryLockLandscape();
+      if (locked && !isPortrait()) {
+        state.pendingLandscapeFullscreen = false;
+        setWebFullscreen(true);
+        return;
+      }
+
+      setWebFullscreen(false, true);
+      setFit("contain", false);
+      showToast("가로로 돌리면 전체화면으로 전환돼.", 2400);
+      return;
+    }
+
+    state.pendingLandscapeFullscreen = false;
+    setWebFullscreen(true);
+    tryLockLandscape();
   }
 
   function toggleFullscreen() {
-    setWebFullscreen(!e.stage.classList.contains("web-fullscreen"));
+    if (e.stage.classList.contains("web-fullscreen")) {
+      setWebFullscreen(false);
+      return;
+    }
+
+    enterLandscapeFullscreen();
+  }
+
+  function handlePlayerOrientationChange() {
+    if (isPortrait()) {
+      setFit("contain", false);
+
+      if (e.stage.classList.contains("web-fullscreen")) {
+        state.pendingLandscapeFullscreen = true;
+        setWebFullscreen(false, true);
+        showToast("세로에서는 원본 화면으로 돌아왔어.", 1800);
+      }
+      return;
+    }
+
+    setFit(localStorage.getItem(K.fit) || "contain", false);
+
+    if (state.pendingLandscapeFullscreen && state.items.length) {
+      state.pendingLandscapeFullscreen = false;
+      setWebFullscreen(true);
+      tryLockLandscape();
+    }
   }
 
   function cycleRepeat() {
@@ -1684,6 +1780,24 @@
 
   document.addEventListener("freeze", pauseForBackground);
 
+  const orientationQuery = window.matchMedia("(orientation: portrait)");
+  if (orientationQuery.addEventListener) {
+    orientationQuery.addEventListener("change", handlePlayerOrientationChange);
+  } else if (orientationQuery.addListener) {
+    orientationQuery.addListener(handlePlayerOrientationChange);
+  }
+
+  window.addEventListener("orientationchange", () => {
+    setTimeout(handlePlayerOrientationChange, 120);
+    setTimeout(handlePlayerOrientationChange, 420);
+  });
+
+  window.addEventListener("resize", () => {
+    if (document.body.classList.contains("player-active")) {
+      handlePlayerOrientationChange();
+    }
+  });
+
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input,select")) return;
     if (state.locked) return;
@@ -1702,6 +1816,7 @@
 
   setPlaybackRate(Number(localStorage.getItem(K.rate) || 1), false);
   setFit(localStorage.getItem(K.fit) || "contain", false);
+  handlePlayerOrientationChange();
   setSubtitleSize(state.subtitleSize);
   setSubtitlePosition(state.subtitlePosition);
   setupGestures();
