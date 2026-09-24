@@ -49,6 +49,7 @@
     lastResumeSave: 0,
     wakeLock: null,
     mediaLoadToken: 0,
+    orientationTimer: null,
     pendingLandscapeFullscreen: false,
     orientationLockActive: false
   };
@@ -782,8 +783,31 @@
     });
   }
 
+  function viewportSize() {
+    const viewport = window.visualViewport;
+    return {
+      width: Math.round((viewport && viewport.width) || window.innerWidth || 0),
+      height: Math.round((viewport && viewport.height) || window.innerHeight || 0)
+    };
+  }
+
   function isPortrait() {
-    return window.matchMedia("(orientation: portrait)").matches;
+    const size = viewportSize();
+    return size.height >= size.width;
+  }
+
+  function syncFullscreenViewport() {
+    if (!e.stage.classList.contains("web-fullscreen")) {
+      e.stage.style.removeProperty("--fullscreen-width");
+      e.stage.style.removeProperty("--fullscreen-height");
+      return;
+    }
+
+    const size = viewportSize();
+    if (!size.width || !size.height) return;
+
+    e.stage.style.setProperty("--fullscreen-width", size.width + "px");
+    e.stage.style.setProperty("--fullscreen-height", size.height + "px");
   }
 
   function setFit(value, persist) {
@@ -1140,7 +1164,15 @@
     e.full.setAttribute("aria-label", enabled ? "전체화면 종료" : "전체화면");
     showControls(true);
     scheduleHide();
-    requestAnimationFrame(applyAspectRatio);
+    syncFullscreenViewport();
+    requestAnimationFrame(() => {
+      syncFullscreenViewport();
+      applyAspectRatio();
+    });
+    setTimeout(() => {
+      syncFullscreenViewport();
+      applyAspectRatio();
+    }, 320);
 
     if (!enabled) unlockOrientation();
   }
@@ -1178,12 +1210,17 @@
   }
 
   function handlePlayerOrientationChange() {
-    if (isPortrait()) {
+    const portrait = isPortrait();
+
+    if (portrait) {
       setFit("contain", false);
 
       if (e.stage.classList.contains("web-fullscreen")) {
         state.pendingLandscapeFullscreen = true;
         setWebFullscreen(false, true);
+      } else {
+        syncFullscreenViewport();
+        requestAnimationFrame(applyAspectRatio);
       }
       return;
     }
@@ -1194,9 +1231,21 @@
       state.pendingLandscapeFullscreen = false;
       setWebFullscreen(true);
       tryLockLandscape();
+    } else {
+      syncFullscreenViewport();
+      requestAnimationFrame(applyAspectRatio);
     }
+  }
 
-    requestAnimationFrame(applyAspectRatio);
+  function scheduleOrientationSync(delay) {
+    clearTimeout(state.orientationTimer);
+    state.orientationTimer = setTimeout(() => {
+      handlePlayerOrientationChange();
+      setTimeout(() => {
+        syncFullscreenViewport();
+        applyAspectRatio();
+      }, 180);
+    }, delay || 260);
   }
 
   function cycleRepeat() {
@@ -1818,21 +1867,28 @@
 
   const orientationQuery = window.matchMedia("(orientation: portrait)");
   if (orientationQuery.addEventListener) {
-    orientationQuery.addEventListener("change", handlePlayerOrientationChange);
+    orientationQuery.addEventListener("change", () => scheduleOrientationSync(300));
   } else if (orientationQuery.addListener) {
-    orientationQuery.addListener(handlePlayerOrientationChange);
+    orientationQuery.addListener(() => scheduleOrientationSync(300));
   }
 
   window.addEventListener("orientationchange", () => {
-    setTimeout(handlePlayerOrientationChange, 120);
-    setTimeout(handlePlayerOrientationChange, 420);
+    scheduleOrientationSync(360);
   });
 
   window.addEventListener("resize", () => {
     if (document.body.classList.contains("player-active")) {
-      handlePlayerOrientationChange();
+      scheduleOrientationSync(280);
     }
   });
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", () => {
+      if (document.body.classList.contains("player-active")) {
+        scheduleOrientationSync(280);
+      }
+    });
+  }
 
   window.addEventListener("keydown", (event) => {
     if (event.target.matches("input,select")) return;
