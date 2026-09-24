@@ -13,7 +13,7 @@
     autoNext: "jp.web.autoNext",
     rewInterval: "jp.web.rewInterval",
     fwdInterval: "jp.web.fwdInterval",
-    subSize: "jp.web.subSize",
+    subSize: "jp.web.subSizeV2",
     subPos: "jp.web.subPosStep",
     subLineHeight: "jp.web.subLineHeight",
     subOutline: "jp.web.subOutline",
@@ -1277,10 +1277,11 @@
   }
 
   function setSubtitleSize(value) {
-    state.subtitleSize = clamp(Math.round(value / 10) * 10, 90, 180);
+    state.subtitleSize = clamp(Math.round(value / 10) * 10, 50, 200);
     e.subs.style.fontSize = String(state.subtitleSize) + "%";
     e.subSize.textContent = String(state.subtitleSize);
-    e.subSmall.disabled = state.subtitleSize <= 90;
+    e.subSmall.disabled = state.subtitleSize <= 50;
+    e.subLarge.disabled = state.subtitleSize >= 200;
     localStorage.setItem(K.subSize, String(state.subtitleSize));
   }
 
