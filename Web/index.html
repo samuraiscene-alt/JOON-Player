@@ -64,7 +64,9 @@
       <button id="pip" class="action">PiP 시작</button>
     </div>
     <div class="group"><h2>자막</h2>
-      <label class="action">SRT 파일 선택<input id="srt" type="file" accept=".srt,text/plain" hidden></label><button id="subToggle" class="action">자막 표시 끄기</button>
+      <label class="action">SRT 파일 선택<input id="srt" type="file" accept=".srt,text/plain" multiple hidden></label>
+      <div class="setting"><span>자막 언어</span><select id="subLang"><option value="auto">자동</option><option value="off">끔</option></select></div>
+      <button id="subToggle" class="action">자막 표시 끄기</button>
       <div class="setting"><span>싱크</span><div class="mini"><button id="subMinus">−0.1</button><button id="subReset">0.0s</button><button id="subPlus">+0.1</button></div></div>
       <div class="setting"><span>크기</span><div class="mini"><button id="subSmall">−</button><button id="subSize">100%</button><button id="subLarge">＋</button></div></div>
       <div class="setting"><span>위치</span><select id="subPos"><option value="low">기본</option><option value="mid">위로</option><option value="high">더 위로</option></select></div>
