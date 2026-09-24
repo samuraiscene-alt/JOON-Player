@@ -135,7 +135,11 @@
   }
 
   function fileStem(name) {
-    return String(name || "").replace(/\.[^.]+$/, "").trim().toLowerCase();
+    return String(name || "")
+      .replace(/\.[^.]+$/, "")
+      .replace(/\.(?:srt|smi)$/i, "")
+      .trim()
+      .toLowerCase();
   }
 
   function seasonEpisode(name) {
@@ -362,7 +366,7 @@
     e.subToggle.checked = true;
 
     if (file) {
-      loadSRT(file, item.id, automatic);
+      loadSubtitle(file, item.id, automatic);
     } else {
       state.cues = [];
       e.subs.textContent = "";
@@ -439,7 +443,7 @@
     const candidates = selected
       .filter((file) => /\.(mp4|m4v|mov)$/i.test(file.name))
       .sort(compareVideoFiles);
-    const subtitles = selected.filter((file) => /\.srt$/i.test(file.name));
+    const subtitles = selected.filter((file) => /\.(srt|smi)$/i.test(file.name));
     const unsupportedVideos = selected.filter((file) =>
       /\.(mkv|avi|ts|m2ts|webm|flv)$/i.test(file.name)
     );
@@ -1039,9 +1043,70 @@
     }).filter(Boolean);
   }
 
-  async function loadSRT(file, targetId, automatic) {
+  function samiPlainText(fragment) {
+    const box = document.createElement("div");
+    box.innerHTML = String(fragment || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p\s*>/gi, "\n");
+
+    return String(box.textContent || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\r/g, "")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n[ \t]+/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function parseSMI(text) {
+    const source = String(text || "").replace(/\r/g, "");
+    const syncPattern = /<sync\b[^>]*\bstart\s*=\s*["']?(\d+(?:\.\d+)?)["']?[^>]*>/gi;
+    const syncs = [];
+    let match;
+
+    while ((match = syncPattern.exec(source)) !== null) {
+      syncs.push({
+        startMs: Number(match[1]),
+        contentStart: syncPattern.lastIndex,
+        tagStart: match.index
+      });
+    }
+
+    if (!syncs.length) return [];
+
+    const cues = [];
+
+    for (let i = 0; i < syncs.length; i += 1) {
+      const current = syncs[i];
+      const next = syncs[i + 1];
+      const fragment = source.slice(
+        current.contentStart,
+        next ? next.tagStart : source.length
+      );
+
+      const textValue = samiPlainText(fragment);
+      if (!textValue) continue;
+
+      const start = current.startMs / 1000;
+      const end = next
+        ? Math.max(start + 0.001, next.startMs / 1000)
+        : start + 5;
+
+      cues.push({ start, end, text: textValue });
+    }
+
+    return cues;
+  }
+
+  function parseSubtitle(text, fileName) {
+    return /\.smi$/i.test(String(fileName || ""))
+      ? parseSMI(text)
+      : parseSRT(text);
+  }
+
+  async function loadSubtitle(file, targetId, automatic) {
     try {
-      const cues = parseSRT(await readSubtitleText(file));
+      const cues = parseSubtitle(await readSubtitleText(file), file && file.name);
       if (targetId && state.items[state.index]?.id !== targetId) return;
 
       if (!cues.length) {
