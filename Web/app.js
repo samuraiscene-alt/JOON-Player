@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rewInterval","fwdInterval","rates","aspectRatio","setA","setB","clearAB","sleep","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","subLineHeight","subOutline","subShadow","subBackground","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rewInterval","fwdInterval","rates","aspectRatio","setA","setB","clearAB","sleep","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPosMinus","subPos","subPosPlus","subLineHeight","subOutline","subShadow","subBackground","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -51,7 +51,14 @@
     subtitleEnabled: true,
     subtitleDelay: 0,
     subtitleSize: Number(localStorage.getItem(K.subSize) || 100),
-    subtitlePosition: localStorage.getItem(K.subPos) || "low",
+    subtitlePosition: (() => {
+      const saved = localStorage.getItem(K.subPos);
+      if (saved === "mid") return 24;
+      if (saved === "high") return 34;
+      if (saved === "low" || saved === null) return 14;
+      const value = Number(saved);
+      return Number.isFinite(value) ? value : 14;
+    })(),
     brightness: 1,
     gesture: null,
     holdTimer: null,
@@ -1262,10 +1269,12 @@
   }
 
   function setSubtitlePosition(value) {
-    state.subtitlePosition = value;
-    e.subs.className = "subs " + (value === "mid" ? "mid" : value === "high" ? "high" : "");
-    e.subPos.value = value;
-    localStorage.setItem(K.subPos, value);
+    const position = clamp(Math.round(Number(value) / 2) * 2, 2, 40);
+    state.subtitlePosition = position;
+    e.subs.className = "subs";
+    e.subs.style.bottom = String(position) + "%";
+    e.subPos.textContent = String(position) + "%";
+    localStorage.setItem(K.subPos, String(position));
   }
 
   function setSkipIntervals() {
@@ -1925,7 +1934,9 @@
   e.subSmall.addEventListener("click", () => setSubtitleSize(state.subtitleSize - 10));
   e.subLarge.addEventListener("click", () => setSubtitleSize(state.subtitleSize + 10));
   e.subSize.addEventListener("click", () => setSubtitleSize(100));
-  e.subPos.addEventListener("change", () => setSubtitlePosition(e.subPos.value));
+  e.subPosMinus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition - 2));
+  e.subPos.addEventListener("click", () => setSubtitlePosition(14));
+  e.subPosPlus.addEventListener("click", () => setSubtitlePosition(state.subtitlePosition + 2));
   e.subLineHeight.addEventListener("change", saveSubtitleStyle);
   e.subOutline.addEventListener("change", saveSubtitleStyle);
   e.subShadow.addEventListener("change", saveSubtitleStyle);
