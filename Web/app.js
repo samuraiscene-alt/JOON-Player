@@ -2,7 +2,7 @@
   "use strict";
 
   const $ = (id) => document.getElementById(id);
-  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rates","aspectRatio","setA","setB","clearAB","sleep","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
+  const ids = ["home","player","videos","folderInput","video","stage","dim","subs","gesture","feedback","controls","unlock","openTop","openMain","resumeSession","openFolderMain","add","addFolder","back","name","pos","now","dur","seek","play","rew","fwd","prev","next","lock","mute","full","settingsBtn","queueBtn","settings","queue","resumeToggle","autoNextToggle","rewInterval","fwdInterval","rates","aspectRatio","setA","setB","clearAB","sleep","pip","srt","subLang","subToggle","subMinus","subReset","subPlus","subSmall","subSize","subLarge","subPos","subLineHeight","subOutline","subShadow","subBackground","repeat","shuffle","resetProgress","clearQueue","list","toast","errorModal","errorText","errorOk","errorNext"];
   const e = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
   const K = {
@@ -11,8 +11,14 @@
     aspectRatio: "jp.web.aspectRatio",
     resumeEnabled: "jp.web.resumeEnabled",
     autoNext: "jp.web.autoNext",
+    rewInterval: "jp.web.rewInterval",
+    fwdInterval: "jp.web.fwdInterval",
     subSize: "jp.web.subSize",
     subPos: "jp.web.subPos",
+    subLineHeight: "jp.web.subLineHeight",
+    subOutline: "jp.web.subOutline",
+    subShadow: "jp.web.subShadow",
+    subBackground: "jp.web.subBackground",
     resume: "jp.web.resume.",
     progress: "jp.web.progress."
   };
@@ -26,7 +32,13 @@
     shuffle: false,
     resumeEnabled: localStorage.getItem(K.resumeEnabled) !== "0",
     autoNext: localStorage.getItem(K.autoNext) !== "0",
+    rewInterval: Number(localStorage.getItem(K.rewInterval) || 10),
+    fwdInterval: Number(localStorage.getItem(K.fwdInterval) || 10),
     aspectRatio: localStorage.getItem(K.aspectRatio) || "auto",
+    subtitleLineHeight: Number(localStorage.getItem(K.subLineHeight) || 120),
+    subtitleOutline: localStorage.getItem(K.subOutline) === "1",
+    subtitleShadow: localStorage.getItem(K.subShadow) !== "0",
+    subtitleBackground: localStorage.getItem(K.subBackground) === "1",
     locked: false,
     hideTimer: null,
     toastTimer: null,
@@ -1103,6 +1115,43 @@
     localStorage.setItem(K.subPos, value);
   }
 
+  function setSkipIntervals() {
+    state.rewInterval = Number(e.rewInterval.value) || 10;
+    state.fwdInterval = Number(e.fwdInterval.value) || 10;
+    localStorage.setItem(K.rewInterval, String(state.rewInterval));
+    localStorage.setItem(K.fwdInterval, String(state.fwdInterval));
+    e.rew.textContent = "−" + String(state.rewInterval);
+    e.fwd.textContent = "+" + String(state.fwdInterval);
+    e.rew.setAttribute("aria-label", String(state.rewInterval) + "초 뒤로");
+    e.fwd.setAttribute("aria-label", String(state.fwdInterval) + "초 앞으로");
+  }
+
+  function applySubtitleStyle() {
+    e.subs.style.lineHeight = String(state.subtitleLineHeight / 100);
+    e.subs.dataset.outline = state.subtitleOutline ? "1" : "0";
+    e.subs.dataset.shadow = state.subtitleShadow ? "1" : "0";
+    e.subs.dataset.background = state.subtitleBackground ? "1" : "0";
+
+    e.subLineHeight.value = String(state.subtitleLineHeight);
+    e.subOutline.checked = state.subtitleOutline;
+    e.subShadow.checked = state.subtitleShadow;
+    e.subBackground.checked = state.subtitleBackground;
+  }
+
+  function saveSubtitleStyle() {
+    state.subtitleLineHeight = Number(e.subLineHeight.value) || 120;
+    state.subtitleOutline = Boolean(e.subOutline.checked);
+    state.subtitleShadow = Boolean(e.subShadow.checked);
+    state.subtitleBackground = Boolean(e.subBackground.checked);
+
+    localStorage.setItem(K.subLineHeight, String(state.subtitleLineHeight));
+    localStorage.setItem(K.subOutline, state.subtitleOutline ? "1" : "0");
+    localStorage.setItem(K.subShadow, state.subtitleShadow ? "1" : "0");
+    localStorage.setItem(K.subBackground, state.subtitleBackground ? "1" : "0");
+
+    applySubtitleStyle();
+  }
+
   async function togglePiP() {
     try {
       if (document.pictureInPictureElement) {
@@ -1510,7 +1559,7 @@
         if (now - state.lastTapAt < 320) {
           clearTimeout(state.tapTimer);
           state.lastTapAt = 0;
-          seekBy(g.lastX < innerWidth / 2 ? -10 : 10);
+          seekBy(g.lastX < innerWidth / 2 ? -state.rewInterval : state.fwdInterval);
         } else {
           state.lastTapAt = now;
 
@@ -1594,8 +1643,8 @@
     else e.video.pause();
   });
 
-  e.rew.addEventListener("click", () => seekBy(-10));
-  e.fwd.addEventListener("click", () => seekBy(10));
+  e.rew.addEventListener("click", () => seekBy(-state.rewInterval));
+  e.fwd.addEventListener("click", () => seekBy(state.fwdInterval));
   e.prev.addEventListener("click", previous);
   e.next.addEventListener("click", () => next(false));
 
@@ -1640,6 +1689,9 @@
     state.autoNext = Boolean(e.autoNextToggle.checked);
     localStorage.setItem(K.autoNext, state.autoNext ? "1" : "0");
   });
+
+  e.rewInterval.addEventListener("change", setSkipIntervals);
+  e.fwdInterval.addEventListener("change", setSkipIntervals);
 
   e.rates.addEventListener("click", (event) => {
     const button = event.target.closest("[data-rate]");
@@ -1701,6 +1753,10 @@
   e.subLarge.addEventListener("click", () => setSubtitleSize(state.subtitleSize + 10));
   e.subSize.addEventListener("click", () => setSubtitleSize(100));
   e.subPos.addEventListener("change", () => setSubtitlePosition(e.subPos.value));
+  e.subLineHeight.addEventListener("change", saveSubtitleStyle);
+  e.subOutline.addEventListener("change", saveSubtitleStyle);
+  e.subShadow.addEventListener("change", saveSubtitleStyle);
+  e.subBackground.addEventListener("change", saveSubtitleStyle);
 
   e.repeat.addEventListener("click", cycleRepeat);
   e.shuffle.addEventListener("click", toggleShuffle);
@@ -1899,9 +1955,9 @@
       event.preventDefault();
       e.play.click();
     } else if (event.key === "ArrowLeft") {
-      seekBy(-10);
+      seekBy(-state.rewInterval);
     } else if (event.key === "ArrowRight") {
-      seekBy(10);
+      seekBy(state.fwdInterval);
     } else if (event.key.toLowerCase() === "m") {
       e.mute.click();
     }
@@ -1909,8 +1965,12 @@
 
   e.resumeToggle.checked = state.resumeEnabled;
   e.autoNextToggle.checked = state.autoNext;
+  e.rewInterval.value = String(state.rewInterval);
+  e.fwdInterval.value = String(state.fwdInterval);
   e.subToggle.checked = state.subtitleEnabled;
   e.aspectRatio.value = state.aspectRatio;
+  setSkipIntervals();
+  applySubtitleStyle();
   setPlaybackRate(Number(localStorage.getItem(K.rate) || 1), false);
   setFit(localStorage.getItem(K.fit) || "contain", false);
   setAspectRatio(state.aspectRatio, false);
