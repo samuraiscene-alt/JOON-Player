@@ -20,7 +20,7 @@
     .icon{width:44px;height:44px;border-radius:13px;background:#ffffff12}.home{display:grid;justify-items:center;gap:14px;text-align:center;padding:70px 24px;max-width:560px;margin:auto}.home-logo{width:118px;height:118px;border-radius:28px;font-size:52px}
     .home h1{font-size:34px;margin:4px 0}.home p{margin:0;color:var(--muted);line-height:1.55}.home-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}.primary,.secondary{min-width:150px;min-height:52px;border-radius:16px;font-weight:800}.primary{background:linear-gradient(135deg,#ff5420,#ef0026)}.secondary{background:#ffffff14}
     .stage{position:relative;height:calc(100svh - 60px - env(safe-area-inset-top) - env(safe-area-inset-bottom));min-height:0;background:#000;overflow:hidden;touch-action:none}.stage video{width:100%;height:100%;object-fit:contain;background:#000}.stage[data-fit="fill"] video{object-fit:fill}.stage[data-fit="cover"] video{object-fit:cover}.stage.web-fullscreen{position:fixed;inset:0;z-index:1000;width:var(--fullscreen-width,100vw);height:var(--fullscreen-height,100dvh);min-height:0;background:#000}.stage.web-fullscreen video{width:100%;height:100%;min-height:0}.player-fullscreen{overflow:hidden}
-    .dim{position:absolute;inset:0;background:#000;pointer-events:none;z-index:2;opacity:0}.subs{position:absolute;left:5%;right:5%;bottom:14%;z-index:5;text-align:center;white-space:pre-line;font-size:24px;font-weight:700;text-shadow:0 2px 6px #000,0 0 12px #000;pointer-events:none}.subs.mid{bottom:24%}.subs.high{bottom:34%}
+    .dim{position:absolute;inset:0;background:#000;pointer-events:none;z-index:2;opacity:0}.subs{position:absolute;left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:90%;bottom:14%;z-index:5;text-align:center;white-space:pre-line;font-size:24px;font-weight:700;line-height:1.2;text-shadow:none;-webkit-text-stroke:0 transparent;padding:.08em .22em;border-radius:.24em;pointer-events:none}.subs.mid{bottom:24%}.subs.high{bottom:34%}.subs[data-outline="1"]{-webkit-text-stroke:1px #000}.subs[data-shadow="1"]{text-shadow:0 2px 6px #000,0 0 12px #000}.subs[data-background="1"]{background:#0009}
     .gesture{position:absolute;inset:0;z-index:6;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}.controls{position:absolute;inset:0;z-index:8;display:flex;flex-direction:column;justify-content:space-between;padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(28px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));background:linear-gradient(#0009,transparent 34%,transparent 60%,#000c);transition:.16s;pointer-events:none}.controls button,.controls input{pointer-events:auto}.controls.hide{opacity:0;pointer-events:none}
     .top,.bottom,.row,.transport{display:flex;align-items:center}.top{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:10px;min-width:0;width:100%}.top>.row:first-child{min-width:0}.top>.row:last-child{flex:0 0 auto;gap:6px}.row{gap:8px}.file{flex:1;min-width:0;overflow:hidden}.file strong{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}.file small{color:var(--muted)}
     .bottom{flex-direction:column;gap:12px}.timeline{width:100%;display:grid;grid-template-columns:48px 1fr 48px;align-items:center;gap:7px;font-size:11px}.timeline span:last-child{text-align:right}.timeline input{width:100%}
@@ -70,6 +70,26 @@
       <div class="settings-row">
         <span>다음 영상 자동 재생</span>
         <label class="switch"><input id="autoNextToggle" type="checkbox" checked><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>뒤로 이동</span>
+        <select id="rewInterval">
+          <option value="5">5초</option>
+          <option value="10">10초</option>
+          <option value="15">15초</option>
+          <option value="30">30초</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <span>앞으로 이동</span>
+        <select id="fwdInterval">
+          <option value="5">5초</option>
+          <option value="10">10초</option>
+          <option value="15">15초</option>
+          <option value="30">30초</option>
+        </select>
       </div>
 
       <div class="settings-row">
@@ -129,6 +149,31 @@
       <div class="settings-row">
         <span>위치</span>
         <select id="subPos"><option value="low">기본</option><option value="mid">위로</option><option value="high">더 위로</option></select>
+      </div>
+
+      <div class="settings-row">
+        <span>줄 간격</span>
+        <select id="subLineHeight">
+          <option value="100">100%</option>
+          <option value="120">120%</option>
+          <option value="140">140%</option>
+          <option value="160">160%</option>
+        </select>
+      </div>
+
+      <div class="settings-row">
+        <span>외곽선</span>
+        <label class="switch"><input id="subOutline" type="checkbox"><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>그림자</span>
+        <label class="switch"><input id="subShadow" type="checkbox" checked><span></span></label>
+      </div>
+
+      <div class="settings-row">
+        <span>배경</span>
+        <label class="switch"><input id="subBackground" type="checkbox"><span></span></label>
       </div>
     </div>
   </aside>
