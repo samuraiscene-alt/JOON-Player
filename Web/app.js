@@ -434,11 +434,7 @@
     if (!candidates.length) {
       if (subtitles.length && state.items.length) {
         const matched = attachSubtitlesToItems(subtitles, state.items);
-        showToast(
-          matched
-            ? "자막 " + String(matched) + "개 자동 연결"
-            : "연결할 자막을 찾지 못했어."
-        );
+        if (!matched) showToast("연결할 자막을 찾지 못했어.");
         return;
       }
 
@@ -492,7 +488,7 @@
 
     const currentId = state.index >= 0 ? state.items[state.index]?.id : null;
     const existingItems = state.items.slice();
-    const matchedExisting = attachSubtitlesToItems(subtitles, existingItems);
+    attachSubtitlesToItems(subtitles, existingItems);
 
     state.items.push(...added);
     state.items.sort((a, b) => compareVideoFiles(a.file, b.file));
@@ -533,14 +529,12 @@
           );
         }, 450);
       }
-    } else {
-      const matched = added.reduce((sum, item) => sum + subtitleFilesForItem(item).length, 0) + matchedExisting;
+    } else if (skipped || unsupportedVideos.length) {
       showToast(
-        String(files.length) + "개 파일 추가" +
-        (matched ? " · 자막 " + String(matched) + "개 자동 연결" : "") +
-        (skipped ? " · 중복 " + String(skipped) + "개 제외" : "") +
+        (skipped ? "중복 " + String(skipped) + "개 제외" : "") +
+        (skipped && unsupportedVideos.length ? " · " : "") +
         (unsupportedVideos.length
-          ? " · 지원 안 됨 " + String(unsupportedVideos.length) + "개 제외"
+          ? "지원 안 됨 " + String(unsupportedVideos.length) + "개 제외"
           : "")
       );
     }
@@ -595,7 +589,6 @@
         const stored = Number(localStorage.getItem(K.resume + fingerprint(item.file)) || 0);
         if (stored >= 10 && Number.isFinite(e.video.duration) && e.video.duration - stored >= 30) {
           e.video.currentTime = stored;
-          showToast(formatTime(stored) + "에서 이어볼게.");
         }
       }
 
@@ -737,11 +730,9 @@
 
     if (fromEnded) {
       openSheet(e.queue);
-      showToast("재생이 끝났어.");
       return;
     }
 
-    showToast("마지막 영상이야.");
   }
 
   function previous() {
@@ -936,13 +927,11 @@
     if (which === "a") {
       state.a = e.video.currentTime;
       if (state.b !== null && state.b <= state.a) state.b = null;
-      showToast("A: " + formatTime(state.a));
       return;
     }
 
     if (state.a === null) state.a = 0;
     state.b = Math.max(e.video.currentTime, state.a + 0.2);
-    showToast("B: " + formatTime(state.b));
   }
 
   function setSleepTimer(value) {
@@ -961,7 +950,6 @@
     state.sleepTimer = setTimeout(() => {
       e.video.pause();
       e.sleep.value = "off";
-      showToast("취침 타이머가 끝났어.");
     }, minutes * 60000);
 
   }
@@ -1429,7 +1417,6 @@
         e.dim.style.opacity = String(1 - state.brightness);
         showFeedback("영상 밝기 " + String(Math.round(state.brightness * 100)) + "%");
       } else if (g.mode === "volume") {
-        showFeedback("아이폰 볼륨은 측면 버튼으로 조절");
       }
     });
 
@@ -1756,7 +1743,6 @@
     if (state.sleepAtEnd) {
       state.sleepAtEnd = false;
       e.sleep.value = "off";
-      showToast("현재 영상 끝에서 멈췄어.");
       return;
     }
 
