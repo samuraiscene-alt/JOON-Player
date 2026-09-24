@@ -63,7 +63,8 @@
     mediaLoadToken: 0,
     orientationTimer: null,
     pendingLandscapeFullscreen: false,
-    orientationLockActive: false
+    orientationLockActive: false,
+    controlsInteracting: false
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -782,12 +783,14 @@
   }
 
   function hideControls() {
-    if (!state.locked) e.controls.classList.add("hide");
+    if (!state.locked && !state.controlsInteracting) {
+      e.controls.classList.add("hide");
+    }
   }
 
   function scheduleHide() {
     clearTimeout(state.hideTimer);
-    if (!e.video.paused && !state.locked) {
+    if (!e.video.paused && !state.locked && !state.controlsInteracting) {
       state.hideTimer = setTimeout(hideControls, 3000);
     }
   }
@@ -1764,6 +1767,25 @@
   e.play.addEventListener("click", () => {
     if (e.video.paused) e.video.play().catch(() => showToast("이 파일을 재생할 수 없어."));
     else e.video.pause();
+  });
+
+  function beginControlInteraction() {
+    state.controlsInteracting = true;
+    showControls(true);
+    clearTimeout(state.hideTimer);
+  }
+
+  function endControlInteraction() {
+    if (!state.controlsInteracting) return;
+    state.controlsInteracting = false;
+    scheduleHide();
+  }
+
+  e.controls.addEventListener("pointerdown", beginControlInteraction, { passive: true });
+  e.controls.addEventListener("pointerup", endControlInteraction, { passive: true });
+  e.controls.addEventListener("pointercancel", endControlInteraction, { passive: true });
+  e.controls.addEventListener("pointerleave", (event) => {
+    if (event.buttons === 0) endControlInteraction();
   });
 
   e.rew.addEventListener("click", () => seekBy(-state.rewInterval));
