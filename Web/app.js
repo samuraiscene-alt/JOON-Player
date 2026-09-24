@@ -334,7 +334,6 @@
       state.cues = [];
       e.subs.textContent = "";
       e.subToggle.textContent = "자막 표시 켜기";
-      if (!automatic) showToast("자막 끔");
       return;
     }
 
@@ -801,7 +800,6 @@
     });
 
     if (persist !== false && isPortrait() && requested !== "contain") {
-      showToast("세로 화면에서는 원본 비율로 표시돼.");
     }
   }
 
@@ -900,7 +898,6 @@
 
     if (value === "end") {
       state.sleepAtEnd = true;
-      showToast("현재 영상이 끝나면 멈출게.");
       return;
     }
 
@@ -911,7 +908,6 @@
       showToast("취침 타이머가 끝났어.");
     }, minutes * 60000);
 
-    showToast(String(minutes) + "분 뒤에 멈출게.");
   }
 
   async function readSubtitleText(file) {
@@ -973,10 +969,7 @@
       state.cues = cues;
       state.subtitleDelay = 0;
       e.subReset.textContent = "0.0s";
-      showToast(
-        (automatic ? "자막 자동 연결 · " : "") +
-        file.name + " · " + String(state.cues.length) + "개"
-      );
+
     } catch {
       showToast("자막 파일을 읽지 못했어.");
     }
@@ -1011,7 +1004,6 @@
       ? "자막 표시 끄기"
       : "자막 표시 켜기";
     updateSubtitle();
-    showToast(state.subtitleEnabled ? "자막 표시 켬" : "자막 표시 끔");
   }
 
   function adjustSubtitleDelay(delta) {
@@ -1123,7 +1115,6 @@
 
       setWebFullscreen(false, true);
       setFit("contain", false);
-      showToast("가로로 돌리면 전체화면으로 전환돼.", 2400);
       return;
     }
 
@@ -1148,7 +1139,6 @@
       if (e.stage.classList.contains("web-fullscreen")) {
         state.pendingLandscapeFullscreen = true;
         setWebFullscreen(false, true);
-        showToast("세로에서는 원본 화면으로 돌아왔어.", 1800);
       }
       return;
     }
@@ -1224,7 +1214,6 @@
     if (value) {
       e.controls.classList.add("hide");
       showLockedIndicator();
-      showToast("컨트롤을 잠갔어.");
     } else {
       e.unlock.hidden = true;
       showControls(true);
@@ -1556,7 +1545,6 @@
   e.clearAB.addEventListener("click", () => {
     state.a = null;
     state.b = null;
-    showToast("A-B 반복 해제");
   });
 
   e.sleep.addEventListener("change", () => setSleepTimer(e.sleep.value));
@@ -1573,7 +1561,6 @@
     updatePlaylistProgress(item, 0);
     closeSheets();
     e.video.play().catch(() => {});
-    showToast("처음부터 재생할게.");
   });
 
   e.pip.addEventListener("click", togglePiP);
@@ -1648,7 +1635,6 @@
       e.video.play().catch(() => {});
     }
 
-    showToast("시청기록을 초기화했어.");
   });
 
   e.clearQueue.addEventListener("click", () => {
@@ -1678,7 +1664,6 @@
     document.body.classList.remove("player-active");
     closeSheets();
     updateNavigation();
-    showToast("재생 목록을 비웠어.");
   });
 
   e.video.addEventListener("timeupdate", updateTimeline);
