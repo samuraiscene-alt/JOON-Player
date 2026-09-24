@@ -79,7 +79,13 @@
 
       <div class="settings-row">
         <span>화면 비율</span>
-        <div id="fits" class="chips"><button data-fit="contain" class="on">원본</button><button data-fit="fill">맞춤</button><button data-fit="cover">채우기</button></div>
+        <select id="aspectRatio">
+          <option value="auto">자동</option>
+          <option value="16:9">16:9</option>
+          <option value="4:3">4:3</option>
+          <option value="21:9">21:9</option>
+          <option value="2.35:1">시네마 2.35:1</option>
+        </select>
       </div>
 
       <div class="settings-row">
@@ -92,7 +98,6 @@
         <select id="sleep"><option value="off">끔</option><option value="15">15분</option><option value="30">30분</option><option value="60">60분</option><option value="end">현재 영상 끝</option></select>
       </div>
 
-      <button id="restartCurrent" class="settings-action"><span>처음부터 재생</span><span class="chev">›</span></button>
       <button id="pip" class="settings-action"><span>PiP 시작</span><span class="chev">›</span></button>
     </div>
 
