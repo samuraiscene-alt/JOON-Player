@@ -816,6 +816,8 @@
 
     e.stage.dataset.fit = effective;
     if (persist !== false) localStorage.setItem(K.fit, requested);
+
+    requestAnimationFrame(applyAspectRatio);
   }
 
   function aspectRatioNumber(value) {
@@ -828,8 +830,9 @@
 
   function applyAspectRatio() {
     const ratio = aspectRatioNumber(state.aspectRatio);
+    const fit = e.stage.dataset.fit || "contain";
 
-    if (!ratio) {
+    if (!ratio || fit !== "contain") {
       e.stage.dataset.aspectActive = "0";
       e.video.style.position = "";
       e.video.style.left = "";
@@ -1422,11 +1425,9 @@
         if (scale >= 1.12 && pinch.applied !== "cover") {
           setFit("cover", true);
           pinch.applied = "cover";
-          showFeedback("화면 채우기");
         } else if (scale <= 0.88 && pinch.applied !== "contain") {
           setFit("contain", true);
           pinch.applied = "contain";
-          showFeedback("원본 비율");
         }
 
         return;
