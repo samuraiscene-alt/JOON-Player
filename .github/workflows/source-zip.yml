@@ -1,0 +1,31 @@
+name: Build latest source ZIP
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create source ZIP
+        run: |
+          mkdir -p dist/JOON-Player-latest
+          rsync -a --exclude='.git' --exclude='dist' ./ dist/JOON-Player-latest/
+          cd dist
+          zip -qr JOON-Player-latest.zip JOON-Player-latest
+
+      - name: Upload ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: JOON-Player-latest
+          path: dist/JOON-Player-latest.zip
+          if-no-files-found: error
+          retention-days: 30
